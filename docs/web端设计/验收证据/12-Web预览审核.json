@@ -1,0 +1,177 @@
+{
+  "browser": "Chromium 156.0.8078.4",
+  "fixture": "synthetic data and fresh isolated browser profiles",
+  "observations": [
+    {
+      "viewport": [
+        320,
+        720
+      ],
+      "center_click": false,
+      "hit": {
+        "menu_z": "30",
+        "sidebar_z": "31",
+        "hit_tag": "DIV",
+        "hit_class": "tree",
+        "hit_menu_item": null,
+        "menu_rect": {
+          "x": 80,
+          "y": 162,
+          "width": 220,
+          "height": 187,
+          "top": 162,
+          "right": 300,
+          "bottom": 349,
+          "left": 80
+        },
+        "sidebar_rect": {
+          "x": 0,
+          "y": 0,
+          "width": 280,
+          "height": 720,
+          "top": 0,
+          "right": 280,
+          "bottom": 720,
+          "left": 0
+        }
+      },
+      "workspace_inert_after_navigation": true,
+      "sidebar_visible": true
+    },
+    {
+      "viewport": [
+        375,
+        720
+      ],
+      "center_click": false,
+      "hit": {
+        "menu_z": "30",
+        "sidebar_z": "31",
+        "hit_tag": "DIV",
+        "hit_class": "tree",
+        "hit_menu_item": null,
+        "menu_rect": {
+          "x": 135,
+          "y": 162,
+          "width": 220,
+          "height": 187,
+          "top": 162,
+          "right": 355,
+          "bottom": 349,
+          "left": 135
+        },
+        "sidebar_rect": {
+          "x": 0,
+          "y": 0,
+          "width": 280,
+          "height": 720,
+          "top": 0,
+          "right": 280,
+          "bottom": 720,
+          "left": 0
+        }
+      },
+      "workspace_inert_after_navigation": true,
+      "sidebar_visible": true
+    },
+    {
+      "viewport": [
+        480,
+        720
+      ],
+      "center_click": true,
+      "hit": {
+        "menu_z": "30",
+        "sidebar_z": "31",
+        "hit_tag": "DIV",
+        "hit_class": "menu-item",
+        "hit_menu_item": "搜索",
+        "menu_rect": {
+          "x": 240,
+          "y": 162,
+          "width": 220,
+          "height": 187,
+          "top": 162,
+          "right": 460,
+          "bottom": 349,
+          "left": 240
+        },
+        "sidebar_rect": {
+          "x": 0,
+          "y": 0,
+          "width": 280,
+          "height": 720,
+          "top": 0,
+          "right": 280,
+          "bottom": 720,
+          "left": 0
+        }
+      },
+      "workspace_inert_after_navigation": true,
+      "sidebar_visible": true
+    },
+    {
+      "viewport": [
+        960,
+        720
+      ],
+      "center_click": true,
+      "hit": {
+        "menu_z": "30",
+        "sidebar_z": "auto",
+        "hit_tag": "DIV",
+        "hit_class": "menu-item",
+        "hit_menu_item": "搜索",
+        "menu_rect": {
+          "x": 217,
+          "y": 162,
+          "width": 220,
+          "height": 187,
+          "top": 162,
+          "right": 437,
+          "bottom": 349,
+          "left": 217
+        },
+        "sidebar_rect": {
+          "x": 0,
+          "y": 0,
+          "width": 252,
+          "height": 720,
+          "top": 0,
+          "right": 252,
+          "bottom": 720,
+          "left": 0
+        }
+      },
+      "workspace_inert_after_navigation": false,
+      "sidebar_visible": true
+    }
+  ],
+  "storage": {
+    "onboarding_after_preview": "1",
+    "history_after_synthetic_search": [
+      "示例流程",
+      "preexisting-sentinel"
+    ]
+  },
+  "findings": [
+    "320px: folder-menu center is blocked",
+    "320px: workspace remains inert after menu navigation",
+    "375px: folder-menu center is blocked",
+    "375px: workspace remains inert after menu navigation",
+    "480px: workspace remains inert after menu navigation",
+    "preview changes pre-existing same-origin browser storage"
+  ],
+  "source_sha256": {
+    "src/App.svelte": "f2d316a1db9b7cdcdd8fe1aca33e0ede823d262cebaf36cb440193cde056f668",
+    "src/web/visual-shell.css": "c4285f2cbbb30034ff3c8085bb23999a05625b64ab2c99be8d16d8d3b18d3740",
+    "src/prototype.css": "417b007387b1249b1c9e01d44994ad90585b4fa28309e42ce629b24d675daa78",
+    "tests/visual/fixture.js": "d3412933232362fe82c58fb9cff4c5b0cbd22c9476129ea5c5cfa3a220002fc8",
+    "tests/browser/audit_preview.py": "c5e1623927d80f1d4b22ddbb173a43162a900f362f22b4f910aa067263d200bb"
+  },
+  "screenshot_sha256": "08ad96a2fb944928066c223bd565a25fc30c7963f17e7b7abaf5df6ac208dece",
+  "scope": "independent audit; observed failures remain open",
+  "screenshots": {
+    "12-web-sidebar-menu-320.png": "08ad96a2fb944928066c223bd565a25fc30c7963f17e7b7abaf5df6ac208dece"
+  }
+}

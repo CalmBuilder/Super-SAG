@@ -1,5 +1,9 @@
 # 更新日志 / Changelog
 
+> 以下为上游 SAG-Wiki 历史记录；Super-SAG 的 0.2.8 候选构建尚未正式发布或完成 Windows 实机验收。
+>
+> The entries below are upstream SAG-Wiki history. The Super-SAG 0.2.8 candidate has not been released or accepted on Windows.
+
 ## 0.2.7
 
 - **文档折叠**：Markdown 支持全文、简述、关键句、要点、卡片和导图六个阅读标签，保留原文供编辑。

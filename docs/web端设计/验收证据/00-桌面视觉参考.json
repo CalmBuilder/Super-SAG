@@ -1,0 +1,72 @@
+{
+  "browser": "Chromium 156.0.8078.4",
+  "viewport": "1600x1067",
+  "source": "working-tree desktop Svelte; static reference remains untouched",
+  "fixture": "synthetic files, settings and mocked Tauri bridge; no backend",
+  "checks": [
+    "ask",
+    "search",
+    "folder picker",
+    "index options",
+    "settings",
+    "visual-only preview matches desktop layout at 1600, 1280 and 320 pixels",
+    "preview rejects a synthetic write"
+  ],
+  "page_errors": [],
+  "narrow_observation": {
+    "viewport": 320,
+    "welcome_right": 942,
+    "clipped": true
+  },
+  "limits": [
+    "not a real Windows installation",
+    "not a Web backend or functional acceptance",
+    "matching the original at 320 pixels does not establish mobile usability"
+  ],
+  "source_sha256": {
+    "tests/browser/reference_visual.py": "b2e6c87f3e1e63392c15870798f87e6247addc6a28bd5ae9ae317af8d9e87002",
+    "tests/visual/index.html": "823fe473194c0af04a9ef7d8ea91de3456d90c649d6a5fa0e5b6947498df7b47",
+    "tests/visual/fixture.js": "07bed404fa2ab68f757ca415077b171b7b0eb84a58d6823b30bad213dc15d40a"
+  },
+  "screenshots_sha256": {
+    "00-desktop-ask.png": "45feaa781c6a45efd3ba5f8c9f9df96f7ba48e3e94575dd06f6fc3e602a78bfc",
+    "00-desktop-folder-picker.png": "dddd1a1547a646174d311fc4865ff7b2d9978f38441fb10931042a13e664aa1c",
+    "00-desktop-index-options.png": "65e154620fcc3e9dcbd7e634a40d07629f5d4f2a3a98db75feffd9599f6e5c18",
+    "00-desktop-search.png": "56dcfb617eddd8c78a0b5a816d53e06087be677f54f4e85166e921da83f4395e",
+    "00-desktop-settings.png": "b1ecfa1dabe0cb5f66eb09f6728d0ba05410311cbfa842c9448d7ac6b1860c30",
+    "00-web-preview-1280.png": "edf9da0463f57db33a41035cfc8b1e3c50eb1301b78e019166611b65f5e770b2",
+    "00-web-preview-320.png": "2c570d7ef9329e9590696013603f19f45353bc319c493eee61f0ef2fd815ff1d",
+    "00-web-visual-preview.png": "b9a9e5a7a789412bcd15d130e3a86bf69ece06492b326da4ca8cbfd0bbc7ccc6"
+  },
+  "static_reference_output_guard": "A path inside pros/SAG-Wiki was refused before creating it.",
+  "documentation_site_browser": {
+    "zh": {
+      "status": 200,
+      "links_checked": [
+        "/zh/docs",
+        "/zh/docs/sag2",
+        "/zh/docs/quick-start"
+      ],
+      "images_loaded": 4,
+      "search_results": 56,
+      "page_errors": []
+    },
+    "en": {
+      "status": 200,
+      "links_checked": [
+        "/en/docs",
+        "/en/docs/sag2",
+        "/en/docs/quick-start"
+      ],
+      "images_loaded": 4,
+      "search_results": 60,
+      "page_errors": []
+    }
+  },
+  "other_checks": [
+    "svelte-check passed",
+    "desktop frontend build passed; bundle-size warning",
+    "three targeted Vitest files: 27 passed",
+    "docs-site build passed; third-party CSS highlight warnings"
+  ]
+}

@@ -1,4 +1,4 @@
-# Run on Windows while the packaged SAG Wiki desktop app is open.
+# Run on Windows while the packaged Super-SAG desktop app is open.
 $ErrorActionPreference = 'Stop'
 Add-Type @'
 using System;
@@ -11,11 +11,11 @@ public static class SagWindowIcon {
 }
 '@
 $app = Get-Process -Name 'sag-desktop' | Where-Object { $_.MainWindowHandle -ne 0 }
-if (@($app).Count -ne 1) { throw 'Open exactly one packaged SAG Wiki desktop window.' }
+if (@($app).Count -ne 1) { throw 'Open exactly one packaged Super-SAG desktop window.' }
 [UIntPtr]$icon = [UIntPtr]::Zero
 # WM_GETICON / ICON_BIG: query the actual running window, not the EXE or shortcut.
 $sent = [SagWindowIcon]::SendMessageTimeoutW(
     $app.MainWindowHandle, 0x007F, [UIntPtr]1, [IntPtr]::Zero, 2, 5000, [ref]$icon)
 if ($sent -eq [IntPtr]::Zero) { throw 'Could not query the window icon.' }
-if ($icon -eq [UIntPtr]::Zero) { throw 'SAG Wiki has no taskbar icon (ICON_BIG).' }
-Write-Output 'PASS: the running SAG Wiki window has a taskbar icon.'
+if ($icon -eq [UIntPtr]::Zero) { throw 'Super-SAG has no taskbar icon (ICON_BIG).' }
+Write-Output 'PASS: the running Super-SAG window has a taskbar icon.'

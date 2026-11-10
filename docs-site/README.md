@@ -1,8 +1,8 @@
-# SAG Wiki 文档站 / Documentation site
+# Super-SAG 文档站 / Documentation site
 
-文档站位于 SAG Wiki 仓库的 `docs-site/`，与桌面端、CLI 一起提交和同步到 GitHub、GitLab。使用 Next.js、Fumadocs、React 和 Tailwind CSS，独立运行，不会启动或修改桌面应用。
+文档站位于 Super-SAG 仓库的 `docs-site/`，与桌面端、CLI 一起提交和同步到 GitHub、GitLab。使用 Next.js、Fumadocs、React 和 Tailwind CSS，独立运行，不会启动或修改桌面应用。
 
-The documentation site lives in `docs-site/` within the SAG Wiki repository. Commit and synchronize it with the desktop app and CLI to GitHub and GitLab. It uses Next.js, Fumadocs, React and Tailwind CSS and runs independently from the desktop app.
+The documentation site lives in `docs-site/` within the Super-SAG repository. Commit and synchronize it with the desktop app and CLI to GitHub and GitLab. It uses Next.js, Fumadocs, React and Tailwind CSS and runs independently from the desktop app.
 
 ## 本地运行 / Local preview
 
@@ -44,12 +44,6 @@ Update both languages and affected screenshots when product behavior changes. Se
 
 Dependencies, build outputs, generated sources, QA artifacts and TypeScript caches are local only. The site has no nested Git repository or separate Git remotes.
 
-当前仅提供本地预览，未部署。安装链接指向已发布的桌面版本。
+当前仅提供本地预览，未部署。Super-SAG 尚无已发布的安装包，安装页不链接上游安装程序。部分截图保留上游样式并已说明，需在 Windows 实机验收后继续替换。
 
-This is a local preview, not a deployed site. Downloads point to the published desktop installers.
-
-## Release downloads / 版本下载信息
-
-README 使用 GitHub 最新正式版入口。安装页的 `ReleaseDownloads` 组件在浏览器中读取公开的 GitHub Latest Release API，显示版本、macOS/Windows 安装包链接和实际大小（十进制 MB，一位小数）。版本及附件经过校验；超时、限流或附件不完整时显示提示，用户可通过页面上的最新正式版链接下载。发布新版本后，重新打开安装页即可获取新信息，无需修改配置或提交文档 PR。
-
-README links to the latest stable GitHub Release. The installation page's `ReleaseDownloads` component reads the public Latest Release API in the browser and displays the version, macOS/Windows installers and actual sizes (decimal MB, one decimal place). It validates the release and assets. If requests time out, are rate-limited, or return incomplete assets, the page points readers to its latest-release link. Reopening the page after a release retrieves current downloads without a configuration update or documentation PR.
+This is a local preview, not a deployed site. No Super-SAG installer has been published; the installation page does not offer upstream installers as Super-SAG downloads. Some screenshots retain the upstream appearance and are identified as such; update them after Windows acceptance.

@@ -7,9 +7,9 @@ Run the installed `sag` command from the project directory, not this Skill direc
 
 ## Setup
 
-For installation requests or a missing `sag` command, follow [first-use setup](references/setup.md#first-use-setup). Install the standalone CLI through `npm install -g @zleap-ai/sag`; SAG Wiki desktop is optional. Reuse an existing CLI and configuration.
+For installation requests or a missing `sag` command, follow [first-use setup](references/setup.md#first-use-setup). Super-SAG includes a CLI with the desktop app; use that bundled build and reuse existing configuration. Do not install an upstream SAG-Wiki npm package as a substitute for the Super-SAG CLI.
 
-For installation requests, retrieve this entry and its three linked references from the source URL supplied by the user, then install them for the current agent. A local `/sag-wiki.md` entry is served by the running SAG Wiki service; save it as `SKILL.md` and resolve `references/` against the same local URL. Reuse the installed CLI and its configuration. When no source is supplied, use the [canonical GitHub SKILL.md](https://github.com/Zleap-AI/SAG-Wiki/blob/main/cli/skills/sag/SKILL.md) and [its source folder](https://github.com/Zleap-AI/SAG-Wiki/tree/main/cli/skills/sag).
+For installation requests, retrieve this entry and its three linked references from the source URL supplied by the user, then install them for the current agent. A local `/sag-wiki.md` entry is served by the running Super-SAG service; save it as `SKILL.md` and resolve `references/` against the same local URL. When no source is supplied, use the installed Super-SAG CLI's `sag install` command for the requested agent. Reuse the installed CLI and its configuration.
 
 ## Search
 

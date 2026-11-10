@@ -1,6 +1,6 @@
-# SAG Web Clipper
+# Super-SAG Web Clipper
 
-A standalone webpage-to-Markdown extension using Defuddle. Saving works without SAG Wiki or Obsidian. SAG Wiki provides package downloads and optional indexing of the save folder.
+A standalone webpage-to-Markdown extension using Defuddle. Saving works without Super-SAG or Obsidian. The desktop build provides the Chrome/Edge package and optional indexing of the save folder. The Safari wrapper has not yet been rebranded or validated for Super-SAG.
 
 ## Build
 
@@ -20,10 +20,10 @@ Copy the built Safari app to the release directory, then sign it with `node brow
 
 - The context menu opens a 520 × 660 preview centered over the browser window containing the original webpage. There is no toolbar clipping action or related settings switch. Installation and updates do not customize Safari’s address bar or toolbar layout; usage requires only the webpage context menu. Browsers may still show their own extension-management entry; Safari users can remove it from the toolbar, and Chrome/Edge users can unpin it. The context menu does not use a browser action popup. The window shows the title, source URL, Markdown and destination. No file is written until Save is clicked; Cancel or closing the window discards the preview. Save uses the previewed content even if the source tab changes or closes.
 - Chrome/Edge: `downloads` permission, default browser download directory, optional Save As dialog.
-- Safari: `nativeMessaging` permission, with the native handler bundled in the extension's own app. Its sandbox allows writes to user-authorized folders and system Downloads. No SAG Wiki connection is involved.
+- Safari: `nativeMessaging` permission, with the native handler bundled in the extension's own app. Its sandbox allows writes to user-authorized folders and system Downloads. No desktop connection is involved.
 - The default destination is Documents/sag-wiki/clippings. Safari writes directly to this fixed directory without a bookmark or folder picker, using a sandbox exception restricted to `/Documents/sag-wiki/`; it resolves the real user home rather than the app container. macOS may still show its own Documents access prompt. Chrome/Edge confirm the default folder on first Save. Custom destinations use browser directory handles or Safari security-scoped bookmarks. Settings changes remain drafts until Save settings is clicked; the indexing reminder appears only after applying a destination change. An optional Downloads mode uses the relative subfolder clippings.
 - New files include source URL, title and capture time. Original files are not overwritten; images keep source URLs.
-- SAG Wiki indexing is optional: add the actual save folder once in its folder manager. The extension does not open a local HTTP connection or use a connection code.
+- Super-SAG indexing is optional: add the actual save folder once in its folder manager. The extension does not open a local HTTP connection or use a connection code.
 
 The Windows desktop package includes the Chrome/Edge ZIP. Default folders use the system Documents location through `dirs::document_dir`; selected save locations are browser directory handles, not string paths. Filename and package configuration checks run in `tests/web-clipper-windows.test.js`; these checks do not replace Windows runtime validation.
 

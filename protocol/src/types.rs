@@ -258,7 +258,7 @@ impl Default for UpdateSettings {
     fn default() -> Self {
         Self {
             source: UpdateSource::Github,
-            github_url: "https://github.com/Zleap-AI/SAG-Wiki".into(),
+            github_url: String::new(),
             website_url: String::new(),
         }
     }
@@ -461,6 +461,16 @@ pub struct Progress {
 #[cfg(test)]
 mod default_tests {
     use super::*;
+    #[test]
+    fn update_settings_default_to_no_channel_and_preserve_legacy_values() {
+        let fresh: Settings = serde_json::from_str("{}").unwrap();
+        assert!(fresh.updates.github_url.is_empty());
+        assert!(fresh.updates.website_url.is_empty());
+        let legacy: Settings = serde_json::from_str(r#"{"updates":{"source":"github","github_url":"https://github.com/Zleap-AI/SAG-Wiki","website_url":""}}"#).unwrap();
+        assert_eq!(legacy.updates.github_url, "https://github.com/Zleap-AI/SAG-Wiki");
+        let restored: Settings = serde_json::from_value(serde_json::to_value(legacy).unwrap()).unwrap();
+        assert_eq!(restored.updates.github_url, "https://github.com/Zleap-AI/SAG-Wiki");
+    }
     #[test]
     fn message_timestamps_preserve_existing_history_without_inventing_dates() {
         let old = serde_json::json!({

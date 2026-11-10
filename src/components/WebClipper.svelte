@@ -8,7 +8,7 @@
  async function download(browser:string){busy=true;error='';notice='';try{const path=await api<string|null>('export_web_clipper',{browser});if(path)notice=$t('扩展安装包已保存到 {value0}',{value0:path});}catch(e){error=String(e);}finally{busy=false;}}
  async function addFolder(){busy=true;error='';notice='';try{const path=await api<string|null>('add_web_clipper_folder');if(path)notice=$t('已添加剪藏目录：{value0}',{value0:path});}catch(e){error=String(e);}finally{busy=false;}}
 </script>
-<div class="settings-info-box"><strong>{$t('独立保存网页')}</strong><p>{$t('扩展直接保存 Markdown，无需连接码，也无需运行 SAG Wiki。')}</p></div>
+<div class="settings-info-box"><strong>{$t('独立保存网页')}</strong><p>{$t('扩展直接保存 Markdown，无需连接码，也无需运行 Super-SAG。')}</p></div>
 {#if loaded}
  <section class="settings-group settings-fields">
   <div class="settings-group-heading"><h3>{$t('安装浏览器扩展')}</h3></div>
@@ -28,7 +28,7 @@
  </section>
  <section class="settings-group settings-fields">
   <div class="settings-group-heading"><h3>{$t('加入知识库（可选）')}</h3></div>
-  <p class="settings-help">{$t('选择实际保存剪藏的文件夹，SAG Wiki 会按照文件设置监听并索引其中的 Markdown。扩展保存不依赖此操作。')}</p>
+  <p class="settings-help">{$t('选择实际保存剪藏的文件夹，Super-SAG 会按照文件设置监听并索引其中的 Markdown。扩展保存不依赖此操作。')}</p>
   <div class="settings-card-actions"><Button.Root type="button" class="outline" disabled={busy} onclick={addFolder}>{$t('添加剪藏文件夹')}</Button.Root></div>
  </section>
 {:else if !error}<p role="status">{$t('正在读取设置…')}</p>{/if}

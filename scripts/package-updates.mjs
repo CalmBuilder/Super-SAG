@@ -17,6 +17,7 @@ export function packageUpdates({version, macos, windows, notes = '', output}) {
   assert.ok(keySource?.trim(), 'TAURI_SIGNING_PRIVATE_KEY must be provided by the release environment');
   const key = existsSync(keySource) ? readFileSync(keySource, 'utf8') : keySource;
   const publicKey = JSON.parse(readFileSync(join(root, 'src-tauri/tauri.conf.json'), 'utf8')).plugins.updater.pubkey;
+  assert.ok(publicKey?.trim(), 'An independent Super-SAG update signing key must be configured before packaging updates');
   const destination = resolve(output ?? join(root, 'releases', version, 'updates'));
   const legacy = readFileSync(join(root, 'config/updates/legacy-latest.json'));
   assert.equal(createHash('sha256').update(legacy).digest('hex'), legacyDigest, 'Legacy update manifest must remain unchanged');

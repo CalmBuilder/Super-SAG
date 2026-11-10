@@ -1,2 +1,5 @@
 # Preserve the published legacy update manifest byte for byte on Windows.
 config/updates/legacy-latest.json -text
+
+# The read-only upstream reference is retained byte-for-byte, including its license.
+pros/WeKnora-reference/** -text -whitespace

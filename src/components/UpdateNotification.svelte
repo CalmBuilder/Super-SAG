@@ -7,8 +7,11 @@
  import type {UpdateSettings} from '../lib/types';
  export let config:UpdateSettings=defaultUpdateSettings;
  export let onOpen:()=>void;
+ // Super-SAG has no independently signed update channel yet.
+ export let enabled=false;
  let mounted=false,dismissed='',checkedKey='';
  onMount(()=>{
+  if(!enabled)return;
   mounted=true;
   const timer=setInterval(()=>{void checkUpdates(config)},8*60*60*1000);
   return()=>clearInterval(timer);

@@ -3,19 +3,14 @@ title: "CLI"
 description: "Commands, output formats and index management."
 ---
 
-## Standalone installation and configuration
+## Installation and configuration
 
-sag runs independently, without installing or starting SAG Wiki desktop. Retrieval commands automatically start or reuse the local service.
+The Super-SAG Windows installer includes `sag.exe`. After desktop initialization, open a new terminal and run `sag --version`. Retrieval can start or reuse the local service even after the desktop closes. No standalone Super-SAG npm package has been published; upstream `@zleap-ai/sag` is a separate distribution.
 
-With Node.js 18 or later installed, run on macOS Apple Silicon or Windows x64:
-
-```sh
-npm install -g @zleap-ai/sag
+```powershell
 sag --version
 sag
 ```
-
-The published `@zleap-ai/sag` contains native executables for these two platforms. Rust, source compilation and desktop installation are unnecessary. npm registers the `sag` command. Reuse an existing working `sag` installation.
 
 The first interactive run of `sag` guides configuration of the JEV retrieval service. The endpoint and model prompts show their current values; press Enter to keep them. First-time setup requires a key, entered with hidden input. The default endpoint is `https://api.302ai.cn/typesafeai/v1`, and the model is `jev-latest`. CLI search needs only this retrieval configuration. The answer model is configured separately in desktop.
 
@@ -31,11 +26,11 @@ Usually, run `sag` and enter the key at the hidden prompt. Do not paste keys int
 
 Keys are stored in private configuration for the current user and omitted from configuration output and installation logs. Noninteractive environments do not wait for input. An agent can read the explicit error and ask the user to run `sag` in a terminal. `sag config --if-needed` prompts only when configuration is missing and preserves existing settings. In a normal piped environment, `sag config` only outputs redacted configuration and whether a key exists.
 
-Give your agent the [SAG Skill GitHub link](https://github.com/Zleap-AI/SAG-Wiki/blob/main/cli/skills/sag/SKILL.md) and ask it to follow setup for the current project. It retrieves companion files from the same directory and completes CLI installation, Skill installation, configuration checks, project indexing and retrieval verification. The user enters the first key in a terminal. Building from source is for development; see the [development guide](/en/docs/development).
+Install the bundled Skill for the relevant agent under **Settings → CLI settings**, or use a command such as `sag install codex`. The Skill includes its companion references; verify configuration and search results. See the [development guide](/en/docs/development) for source builds.
 
 ## Sharing with desktop
 
-CLI and the optional SAG Wiki desktop use the same indexing, retrieval and configuration implementation in `core/`, along with the same user data directory, `sag.sqlite`, keys and ignore rules.
+CLI and the optional Super-SAG desktop use the same indexing, retrieval and configuration implementation in `core/`, along with the same user data directory, `sag.sqlite`, keys and ignore rules.
 
 - Desktop and CLI share a standalone background service, configuration and knowledge base. Directory changes appear in both.
 - The service keeps running after desktop exits. `sag add` returns after indexing finishes; background watching updates file and ignore-rule changes.
@@ -155,13 +150,12 @@ Standalone mode rechecks the index before the next search. With desktop auto-wat
 
 | Component | User-level location |
 | --- | --- |
-| npm CLI | npm global installation directory; inspect with `npm prefix -g` |
 | CLI managed by desktop or installed with `sag install cli` | `~/.local/bin` (`sag.exe` on Windows) |
 | Claude Code | `~/.claude/skills/sag/SKILL.md` |
 | Codex | `~/.agents/skills/sag/SKILL.md` |
 | OpenCode | `~/.config/opencode/skills/sag/SKILL.md` |
 
-Update an npm-installed CLI with `npm install -g @zleap-ai/sag`, and remove it with `npm uninstall -g @zleap-ai/sag`. Running `sag install cli` again to create a second command is unnecessary.
+An upstream npm installation is a separate distribution and is not treated as a Super-SAG package.
 
 Repeating `sag install` updates SAG-owned files. Installation records contain checksums, version and the actual CLI installation location. Later PATH-order changes do not change that location, and uninstallation follows the records. If foreign files, user modifications or altered SAG-managed terminal configuration blocks are detected, the installer stops and reports them. Uninstallation removes only verified SAG files and preserves other directory contents.
 

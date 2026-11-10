@@ -21,9 +21,20 @@ const click=(text:string)=>{
 beforeEach(()=>{setLanguage('zh-CN');updateDownload.set({key:'',version:'',stage:'idle',downloaded:0,total:null,error:''});updateState.set({key:'',checking:false,info:null,error:''});invoke.mockReset();invoke.mockResolvedValue(latest)});
 afterEach(async()=>{for(const app of apps.splice(0))await unmount(app);vi.useRealTimers();document.body.innerHTML=''});
 
+it('keeps automatic and manual updates disabled until a Super-SAG signing channel exists',async()=>{
+ vi.useFakeTimers({toFake:['setInterval','clearInterval']});
+ apps.push(mount(UpdateNotification,{target:document.body,props:{config:{...defaultUpdateSettings},onOpen:vi.fn()}}));
+ apps.push(mount(AppUpdates,{target:document.body,props:{config:{...defaultUpdateSettings}}}));
+ await tick();
+ expect(document.body.textContent).toContain('当前构建尚未配置 Super-SAG 独立签名更新');
+ expect(document.querySelector('.app-updates button')).toBeNull();
+ await vi.advanceTimersByTimeAsync(16*60*60*1000);
+ expect(invoke).not.toHaveBeenCalled();
+});
+
 it('checks at startup, shows a new-version prompt and opens About on click',async()=>{
  const onOpen=vi.fn();
- apps.push(mount(UpdateNotification,{target:document.body,props:{config:{...defaultUpdateSettings},onOpen}}));
+ apps.push(mount(UpdateNotification,{target:document.body,props:{enabled:true,config:{...defaultUpdateSettings},onOpen}}));
  await vi.waitFor(()=>expect(document.querySelector('.update-notification')?.textContent).toContain('0.1.6'));
  expect(invoke).toHaveBeenCalledExactlyOnceWith('check_app_update',{config:defaultUpdateSettings});
  document.querySelector<HTMLButtonElement>('.update-open')!.click();await tick();
@@ -34,7 +45,7 @@ it('checks at startup, shows a new-version prompt and opens About on click',asyn
 it('checks every eight hours while mounted and stops checking after unmount',async()=>{
  vi.useFakeTimers({toFake:['setInterval','clearInterval']});
  const interval=8*60*60*1000;
- apps.push(mount(UpdateNotification,{target:document.body,props:{config:{...defaultUpdateSettings},onOpen:vi.fn()}}));
+ apps.push(mount(UpdateNotification,{target:document.body,props:{enabled:true,config:{...defaultUpdateSettings},onOpen:vi.fn()}}));
  await tick();expect(invoke).toHaveBeenCalledOnce();
  await vi.advanceTimersByTimeAsync(interval-1);
  expect(invoke).toHaveBeenCalledOnce();
@@ -51,7 +62,7 @@ it('skips scheduled checks while a request is pending and retries on a later int
  vi.useFakeTimers({toFake:['setInterval','clearInterval']});
  let resolve!:(info:UpdateInfo)=>void;
  invoke.mockImplementationOnce(()=>new Promise<UpdateInfo>(done=>resolve=done));
- apps.push(mount(UpdateNotification,{target:document.body,props:{config:{...defaultUpdateSettings},onOpen:vi.fn()}}));
+ apps.push(mount(UpdateNotification,{target:document.body,props:{enabled:true,config:{...defaultUpdateSettings},onOpen:vi.fn()}}));
  await tick();expect(invoke).toHaveBeenCalledOnce();
  await vi.advanceTimersByTimeAsync(8*60*60*1000);
  expect(invoke).toHaveBeenCalledOnce();
@@ -61,7 +72,7 @@ it('skips scheduled checks while a request is pending and retries on a later int
 });
 
 it('downloads in app, keeps progress across settings navigation, and only installs on request',async()=>{
- apps.push(mount(AppUpdates,{target:document.body,props:{config:{...defaultUpdateSettings}}}));
+ apps.push(mount(AppUpdates,{target:document.body,props:{enabled:true,config:{...defaultUpdateSettings}}}));
  expect(invoke).not.toHaveBeenCalled();
  click('检查更新');
  await vi.waitFor(()=>expect(document.body.textContent).toContain('发现新版本 0.1.6'));
@@ -78,7 +89,7 @@ it('downloads in app, keeps progress across settings navigation, and only instal
  expect(invoke).toHaveBeenLastCalledWith('download_app_update',{config:defaultUpdateSettings,version:'0.1.6',onProgress:expect.anything()});
  expect(document.querySelector<HTMLButtonElement>('.setting-row button')!.disabled).toBe(true);
  await unmount(apps.pop()!);
- apps.push(mount(AppUpdates,{target:document.body,props:{config:{...defaultUpdateSettings}}}));
+ apps.push(mount(AppUpdates,{target:document.body,props:{enabled:true,config:{...defaultUpdateSettings}}}));
  await tick();
  expect(document.body.textContent).toContain('50%');
  finish();
@@ -91,7 +102,7 @@ it('downloads in app, keeps progress across settings navigation, and only instal
 
 it('reports up-to-date versions and surfaces check and download failures',async()=>{
  invoke.mockResolvedValueOnce({...latest,available:false,download_url:null});
- apps.push(mount(AppUpdates,{target:document.body,props:{config:{...defaultUpdateSettings}}}));
+ apps.push(mount(AppUpdates,{target:document.body,props:{enabled:true,config:{...defaultUpdateSettings}}}));
  click('检查更新');
  await vi.waitFor(()=>expect(document.body.textContent).toContain('当前已是最新版本（0.1.5）'));
  expect([...document.querySelectorAll('button')].some(button=>button.textContent?.trim()==='下载更新')).toBe(false);
@@ -130,7 +141,7 @@ it('keeps update addresses hidden and preserves configured sources when saving s
 });
 
 it('does not let a draft repository check trigger another startup check',async()=>{
- apps.push(mount(UpdateNotification,{target:document.body,props:{config:{...defaultUpdateSettings},onOpen:vi.fn()}}));
+ apps.push(mount(UpdateNotification,{target:document.body,props:{enabled:true,config:{...defaultUpdateSettings},onOpen:vi.fn()}}));
  await vi.waitFor(()=>expect(get(updateState).checking).toBe(false));
  const draft={...defaultUpdateSettings,github_url:'https://github.com/customer/wiki'};
  await checkUpdates(draft);await tick();
@@ -140,7 +151,7 @@ it('does not let a draft repository check trigger another startup check',async()
 
 it('renders update controls in English',async()=>{
  setLanguage('en');
- apps.push(mount(AppUpdates,{target:document.body,props:{config:{...defaultUpdateSettings}}}));
+ apps.push(mount(AppUpdates,{target:document.body,props:{enabled:true,config:{...defaultUpdateSettings}}}));
  expect(document.body.textContent).toContain('Check for updates');
  expect(document.body.textContent).not.toMatch(/[\u3400-\u9fff]/);
 });
@@ -150,7 +161,7 @@ it('requires saved-document approval and retains a verified update after install
  await checkUpdates(defaultUpdateSettings);
  await import('../src/lib/updates').then(module=>module.downloadUpdate(defaultUpdateSettings,latest));
  const onBeforeInstall=vi.fn().mockResolvedValueOnce(false).mockResolvedValue(true);
- apps.push(mount(AppUpdates,{target:document.body,props:{config:{...defaultUpdateSettings},onBeforeInstall}}));
+ apps.push(mount(AppUpdates,{target:document.body,props:{enabled:true,config:{...defaultUpdateSettings},onBeforeInstall}}));
  await tick();click('重启并更新');await tick();
  expect(invoke).not.toHaveBeenCalledWith('install_app_update',expect.anything());
  await vi.waitFor(()=>expect(document.querySelector<HTMLButtonElement>('.setting-row button')!.disabled).toBe(false));
@@ -163,7 +174,7 @@ it('requires saved-document approval and retains a verified update after install
 it('does not offer installation after signature verification fails and allows a download retry',async()=>{
  await checkUpdates(defaultUpdateSettings);
  invoke.mockRejectedValueOnce('Invalid signature');
- apps.push(mount(AppUpdates,{target:document.body,props:{config:{...defaultUpdateSettings}}}));
+ apps.push(mount(AppUpdates,{target:document.body,props:{enabled:true,config:{...defaultUpdateSettings}}}));
  await tick();click('下载更新');
  await vi.waitFor(()=>expect(document.querySelector('[role=alert]')?.textContent).toContain('Invalid signature'));
  expect(get(updateDownload).stage).toBe('idle');

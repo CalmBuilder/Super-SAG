@@ -3,19 +3,14 @@ title: "CLI 命令"
 description: "命令参数、输出格式与索引管理。"
 ---
 
-## 独立安装与配置
+## 安装与配置
 
-sag 可以独立运行，不需要安装或启动 SAG Wiki 桌面端。检索命令会自动启动或复用本机服务。
+Super-SAG Windows 安装包随附 `sag.exe`。桌面初始化 CLI 后，重新打开终端并运行 `sag --version`；检索命令可在桌面关闭后启动或复用本机服务。当前尚未发布独立 Super-SAG npm 包，上游 `@zleap-ai/sag` 是另一份发行。
 
-安装 Node.js 18 或以上版本后，在 macOS Apple Silicon 或 Windows x64 上执行：
-
-```sh
-npm install -g @zleap-ai/sag
+```powershell
 sag --version
 sag
 ```
-
-已发布的 `@zleap-ai/sag` 包含这两个平台的原生程序，无需 Rust、源码编译或桌面端。npm 负责注册 `sag` 命令；已有可用的 `sag` 时直接复用。
 
 首次在交互终端运行 `sag` 会引导配置 JEV 检索服务。接口地址和模型名显示当前值，直接回车即可保留；首次使用必须填写密钥，输入隐藏。默认地址为 `https://api.302ai.cn/typesafeai/v1`，模型为 `jev-latest`。纯 CLI 搜索只需要这一项检索配置，问答模型在桌面端另行设置。
 
@@ -31,11 +26,11 @@ sag config --url "$JEV_URL" --model "$JEV_MODEL" --key-stdin < "$JEV_KEY_FILE"
 
 密钥存入当前用户私有配置，不显示在配置结果或安装日志中。非交互环境不会等待输入；Agent 可读取明确错误并提示用户在终端运行 `sag`。`sag config --if-needed` 仅在缺少配置时引导，已有配置则保留；普通管道环境运行 `sag config` 只输出脱敏配置和是否已有密钥。
 
-把 [GitHub 上的 SAG Skill 链接](https://github.com/Zleap-AI/SAG-Wiki/blob/main/cli/skills/sag/SKILL.md) 发给 Agent，并要求按其中的 setup 流程配置当前项目，Agent 会获取同一目录的配套文件，完成 CLI 安装、Skill 安装、配置检查、项目索引和检索验证。首次密钥输入由用户在终端中完成。源代码构建仅用于开发，见[开发指南](/zh/docs/development)。
+在桌面 **设置 → CLI 设置** 中安装对应 Agent 的随附 Skill，或使用 `sag install codex` 等命令。Skill 包含配套参考文件；配置和检索结果仍需实际验证。源代码构建见[开发指南](/zh/docs/development)。
 
 ## 与桌面端共用
 
-CLI 和可选的 SAG Wiki 都引用 `core/` 中同一份索引、检索和配置实现，使用同一用户数据目录及 `sag.sqlite`、密钥和忽略规则。
+CLI 和可选的 Super-SAG 都引用 `core/` 中同一份索引、检索和配置实现，使用同一用户数据目录及 `sag.sqlite`、密钥和忽略规则。
 
 - 桌面和 CLI 共用独立后台服务、同一份配置与知识库，目录变更会同步显示。
 - 退出桌面后服务继续运行；`sag add` 索引完成后返回，文件及忽略规则变化由后台监听更新。
@@ -154,13 +149,12 @@ notes/draft-*.md
 
 | 对象 | 用户级位置 |
 | --- | --- |
-| npm CLI | npm 的全局安装目录，可用 `npm prefix -g` 查看 |
 | 桌面端管理或 `sag install cli` 安装的 CLI | `~/.local/bin`（Windows 文件名为 `sag.exe`） |
 | Claude Code | `~/.claude/skills/sag/SKILL.md` |
 | Codex | `~/.agents/skills/sag/SKILL.md` |
 | OpenCode | `~/.config/opencode/skills/sag/SKILL.md` |
 
-npm 安装的 CLI 用 `npm install -g @zleap-ai/sag` 更新，用 `npm uninstall -g @zleap-ai/sag` 卸载。无需再运行 `sag install cli` 创建第二份命令。
+上游 npm 安装属于另一份发行，不会被当成 Super-SAG 包处理。
 
 `sag install` 重复安装可更新 SAG 自有文件。安装记录保存文件校验值、版本和实际 CLI 安装位置；后续 PATH 顺序变化不会影响安装位置；卸载按记录清理。检测到外部文件、用户修改或被改写的 SAG 终端配置区段时停止并提示。卸载只删除经校验的 SAG 文件，保留同目录的其他内容。
 

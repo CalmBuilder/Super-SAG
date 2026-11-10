@@ -39,3 +39,6 @@ browser-extension/build/
 dist-bench/
 
 /dist-docs/
+
+# Original upstream installer is a local comparison artifact, not our release.
+/docs/web端设计/验收证据/SAG-Wiki-0.2.7-Windows-x64-setup.exe

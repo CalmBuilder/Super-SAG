@@ -43,6 +43,12 @@ struct UpdateManifest {
     notes: String,
     platforms: BTreeMap<String, ManifestPackage>,
 }
+
+// Do not trust the upstream SAG-Wiki signing key or migrated update settings
+// for this distribution. Enable only with an independent Super-SAG channel.
+fn require_super_sag_update_channel() -> Result<()> {
+    bail!("当前构建尚未配置 Super-SAG 独立签名更新，暂不检查或安装更新。")
+}
 #[derive(Deserialize)]
 struct ManifestPackage {
     url: String,
@@ -114,7 +120,7 @@ fn manifest_update(
 async fn check(config: UpdateSettings, current: &str, os: &str, arch: &str) -> Result<UpdateInfo> {
     let endpoint = manifest_endpoint(&config)?;
     let client = reqwest::Client::builder()
-        .user_agent(format!("SAG-Wiki/{current}"))
+        .user_agent(format!("Super-SAG/{current}"))
         .https_only(true)
         .timeout(Duration::from_secs(15))
         .build()?;
@@ -134,6 +140,7 @@ pub async fn check_app_update(
     app: tauri::AppHandle,
     config: UpdateSettings,
 ) -> Result<UpdateInfo, String> {
+    require_super_sag_update_channel().map_err(|error| format!("{error:#}"))?;
     check(
         config,
         &app.package_info().version.to_string(),
@@ -213,6 +220,7 @@ pub async fn download_app_update(
     version: String,
     on_progress: Channel<DownloadProgress>,
 ) -> Result<(), String> {
+    require_super_sag_update_channel().map_err(|error| format!("{error:#}"))?;
     {
         let mut state = session.0.lock().unwrap();
         if state.busy {
@@ -239,6 +247,7 @@ pub async fn install_app_update(
     session: State<'_, UpdateSession>,
     version: String,
 ) -> Result<(), String> {
+    require_super_sag_update_channel().map_err(|error| format!("{error:#}"))?;
     // Installing from cargo run would replace a development build, not the installed application.
     if cfg!(debug_assertions) {
         return Err("请在安装版中执行更新".into());
@@ -277,7 +286,10 @@ mod tests {
 
     #[test]
     fn checks_release_manifest_without_rest_api() {
-        let config = UpdateSettings::default();
+        let config = UpdateSettings {
+            github_url: "https://github.com/Zleap-AI/SAG-Wiki".into(),
+            ..Default::default()
+        };
         assert_eq!(
             github_endpoint(&config.github_url).unwrap(),
             Url::parse("https://github.com/Zleap-AI/SAG-Wiki/releases/latest/download/latest-v2.json")
@@ -510,6 +522,7 @@ mod tests {
         assert_eq!(info.notes, "Website notes");
         let settings: sag_protocol::types::Settings = serde_json::from_str("{}").unwrap();
         assert!(matches!(settings.updates.source, UpdateSource::Github));
+        assert!(settings.updates.github_url.is_empty());
         assert!(settings.updates.website_url.is_empty());
     }
 
@@ -520,9 +533,11 @@ mod tests {
             ("macos", "aarch64", "macOS-arm64.app.tar.gz"),
             ("windows", "x86_64", "Windows-x64-setup.exe"),
         ] {
-            let info =
-                tauri::async_runtime::block_on(check(UpdateSettings::default(), "0.1.6", os, arch))
-                    .unwrap();
+            let config = UpdateSettings {
+                github_url: "https://github.com/Zleap-AI/SAG-Wiki".into(),
+                ..Default::default()
+            };
+            let info = tauri::async_runtime::block_on(check(config, "0.1.6", os, arch)).unwrap();
             assert!(info.available);
             assert!(info.download_url.unwrap().ends_with(suffix));
             assert!(!info.notes.is_empty());

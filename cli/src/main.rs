@@ -20,7 +20,7 @@ use std::{
     version,
     args_conflicts_with_subcommands = true,
     subcommand_negates_reqs = true,
-    about = "独立搜索本地项目，也可与 SAG Wiki 共用知识库",
+    about = "独立搜索本地项目，也可与 Super-SAG 共用知识库",
     group(clap::ArgGroup::new("match_mode").args(["extended_regexp", "fixed_strings"]))
 )]
 struct Args {
@@ -453,10 +453,10 @@ fn run(args: Args, interrupted: Arc<Interrupt>) -> Result<i32> {
             else {
                 println!("已加入知识库：{}", output.path);
                 if output.cli_authorized { println!("CLI 可搜索此目录。"); }
-                else { println!("CLI 接入已关闭，请在 SAG Wiki 设置中启用。"); }
+                else { println!("CLI 接入已关闭，请在 Super-SAG 设置中启用。"); }
                 match output.index_status.as_str() {
                     "ready" => println!("索引已就绪，可以运行 sag \"搜索内容\"。"),
-                    "error" => println!("索引失败，请在 SAG Wiki 查看详情。"),
+                    "error" => println!("索引失败，请在 Super-SAG 查看详情。"),
                     _ => println!("正在建立索引，请用 sag check 查看进度；就绪后可运行 sag \"搜索内容\"。"),
                 }
             }

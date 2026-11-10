@@ -1,6 +1,6 @@
 {
   "name": "sag-desktop",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,7 +10,7 @@
     "tauri": "tauri",
     "test": "vitest run",
     "build:cli": "node scripts/build-cli.mjs",
-    "package:windows": "tauri build --config src-tauri/tauri.windows.conf.json",
+    "package:windows": "node scripts/check-windows-template.mjs && tauri build --config src-tauri/tauri.windows.conf.json",
     "build:cli:dev": "node scripts/build-cli.mjs --debug",
     "package:updates": "node scripts/package-updates.mjs",
     "build:clipper": "npm --prefix browser-extension ci --ignore-scripts && npm --prefix browser-extension run build",

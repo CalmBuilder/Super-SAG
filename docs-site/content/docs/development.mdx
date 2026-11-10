@@ -30,6 +30,14 @@ npm run dev
 
 前端服务器不能替代 Tauri 的本地文件与检索接口。验证完整桌面流程时使用 Tauri 开发入口。
 
+## Web 样式预览（开发中）
+
+在仓库根目录运行 `npx vite --host 127.0.0.1 --port 1427 --strictPort`，然后在本机访问 `http://127.0.0.1:1427/tests/visual/`。预览复用桌面工作区，侧栏和“关于”显示 Super-SAG；窄屏使用可收起的侧栏。访问 `/tests/visual/?fixture=conversation` 可查看虚构会话与引用；访问 `/tests/visual/?fixture=search` 并输入“示例流程”可查看预设搜索结果；访问 `/tests/visual/?fixture=files` 可查看虚构目录、文档编辑与新建时的保存位置选择。浏览器回归中的会话搜索、消息编辑、流式回答、工具状态和确认弹窗同样使用测试数据与事件，不执行真实工具。页面标注虚构数据，仅用于界面开发，不连接真实目录、索引或模型，也不是可部署的 Web 服务。未实现的写操作会报错。
+
+桌面品牌改造仍在进行；Windows 安装和覆盖升级仍需实际验收。不要将测试预览对外提供服务。
+
+该预览会修改同一浏览器源下的部分 `sag.*` 本地存储；请使用独立浏览器配置和专用回环端口。窄屏侧栏的文件夹操作菜单目前存在遮挡及切换后抽屉未关闭的问题。上述预览属于 Windows 基准验收前的开发预研，正式 Web 对照须以验收通过的 Super-SAG Windows 安装版为准。
+
 ## 构建 CLI
 
 ```sh
@@ -57,11 +65,16 @@ npm run tauri build
 
 Windows 使用：
 
-```sh
-npm run package:windows
+```powershell
+git submodule update --init --recursive
+npm.cmd ci
+npm.cmd run check
+npm.cmd run package:windows
 ```
 
-使用目标平台对应的系统依赖和签名配置。可分发产物与原生 CLI 来自同一版本源码。npm 分发见[npm 发布](https://github.com/Zleap-AI/SAG-Wiki/blob/main/docs/zh-CN/npm发布说明.md)。
+需要 Windows x64、Node.js、Rust stable 的 `x86_64-pc-windows-msvc` 目标、Microsoft C++ 构建工具和 WebView2；构建时还需联网取得依赖及 NSIS 工具。每条命令失败时应先排查，不要继续安装。预计安装器位于 `src-tauri/target/release/bundle/nsis/`，以实际产物为准。
+
+安装器构建成功不代表 Windows 验收通过。须先在隔离环境核验全新安装与原版覆盖升级，记录安装包 SHA-256、数据和原件；不要覆盖唯一一份业务数据。当前未发布 Super-SAG 独立 npm 包或签名更新通道。
 
 ## 代码检查
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+ import superSagIconUrl from '../../assets/branding/super-sag-icon.svg?url';
  import {version as appVersion} from '../../src-tauri/tauri.conf.json';
  import {t,setLanguage,type Language} from '../lib/i18n';
  import {onDestroy} from 'svelte';
@@ -22,6 +23,7 @@
  import {defaultUpdateSettings} from '../lib/updates';
  import {providers,providerFor,sameProviderOrigin,type ModelKind} from '../lib/providers';
  export let onShowGuide:(()=>void)|undefined=undefined;
+ export let surface:'desktop'|'web'='desktop';
  export let onIndexHistory:(()=>void)|undefined=undefined;
  export let onBeforeUpdate:(()=>Promise<boolean>)|undefined=undefined;
  export let onSaved:(()=>void)|undefined=undefined;
@@ -210,11 +212,11 @@
      <QuickSearchSettings/>
      <section class="settings-group settings-shortcuts">{#each [[$t("搜索文件"),'⌘ / Ctrl + K'],[$t("新建问答"),'⌘ / Ctrl + N'],[$t("保存文档"),'⌘ / Ctrl + S'],[$t("发送或搜索"),'Enter'],[$t("问题换行"),'Shift + Enter'],[$t("引用文件"),'@'],[$t("选择引用"),'↑ ↓ / Enter / Esc']] as [label,key]}<div class="setting-row"><strong>{label}</strong><kbd>{key}</kbd></div>{/each}</section>
     {:else}
-     <section class="settings-about" aria-label={$t('关于 SAG Wiki')}>
-      <div class="settings-about-mark">{@html logo}</div>
-      <div class="settings-about-copy"><h3>SAG Wiki</h3><p>{$t("向你的文件提问")}</p><span>{$t('Tauri + Rust + SQLite')}</span></div>
+     <section class="settings-about" aria-label={`${$t('关于')} Super-SAG`}>
+      <div class="settings-about-mark">{#if surface==='web'}<img class="brand-mark" src={superSagIconUrl} alt="" aria-hidden="true" draggable="false">{:else}{@html logo}{/if}</div>
+      <div class="settings-about-copy"><h3>Super-SAG</h3><p>{$t("向你的文件提问")}</p><span>{$t('Tauri + Rust + SQLite')}</span></div>
       <span class="settings-about-version">v{appVersion}</span>
-      <div class="settings-about-links"><a href="https://github.com/Zleap-AI/SAG-Wiki" target="_blank" rel="noopener noreferrer" on:click={event=>openAboutLink(event,'project')}>{$t('开源项目')} · GitHub</a><a href="https://zleap.com" target="_blank" rel="noopener noreferrer" on:click={event=>openAboutLink(event,'company')}>{$t('开发公司')} · Zleap</a></div>
+      <div class="settings-about-links"><a href="https://github.com/Zleap-AI/SAG-Wiki" target="_blank" rel="noopener noreferrer" on:click={event=>openAboutLink(event,'project')}>{$t('上游开源项目')} · GitHub</a><a href="https://zleap.com" target="_blank" rel="noopener noreferrer" on:click={event=>openAboutLink(event,'company')}>{$t('上游开发团队')} · Zleap</a></div>
      </section>
      <AppUpdates bind:config={settings.updates} onBeforeInstall={onBeforeUpdate}/>
     {/if}

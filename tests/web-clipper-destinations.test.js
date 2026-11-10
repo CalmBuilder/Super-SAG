@@ -45,7 +45,7 @@ it('shows an authorized location inside the selection and only warns when the fo
  await ui.element('#apply').onclick();
  expect(ui.element('#folder-notice').hidden).toBe(false);
  ui.element('#language').value='zh-CN';await ui.element('#language').onchange();
- expect(ui.element('#folder-notice').textContent).toBe('选择其他文件夹后，请在 SAG Wiki 的文件夹管理中添加，否则无法检索其中的内容。');
+ expect(ui.element('#folder-notice').textContent).toBe('选择其他文件夹后，请在 Super-SAG 的文件夹管理中添加，否则无法检索其中的内容。');
  expect(ui.data.language).toBe('en');
  ui.element('#destination').value='default';await ui.element('#destination').onchange();
  expect(ui.data.destination).toBe('folder');

@@ -126,7 +126,7 @@
 
 {#if confirmUninstall}<Modal label={$t('卸载 Docling 相关组件')} class="docling-uninstall-dialog" onClose={()=>{if(!uninstalling)confirmUninstall=false}}>
  <div class="dialog-head"><h2>{$t('卸载 Docling 相关组件')}</h2></div>
- <div class="dialog-body"><p>{$t('将删除 SAG Wiki 安装的文档与音视频组件、运行环境、模型、FFmpeg 和下载缓存。原文件、.sag-converted 中的转换文件及已有索引都会保留。')}</p><p>{$t('卸载后普通文档仍可解析；扫描 PDF 和其他格式需要重新安装 Docling。')}</p>{#if uninstallError}<p class="form-error" role="alert">{$t(uninstallError)}</p>{/if}</div>
+ <div class="dialog-body"><p>{$t('将删除 Super-SAG 安装的文档与音视频组件、运行环境、模型、FFmpeg 和下载缓存。原文件、.sag-converted 中的转换文件及已有索引都会保留。')}</p><p>{$t('卸载后普通文档仍可解析；扫描 PDF 和其他格式需要重新安装 Docling。')}</p>{#if uninstallError}<p class="form-error" role="alert">{$t(uninstallError)}</p>{/if}</div>
  <div class="dialog-footer"><Button.Root type="button" disabled={uninstalling} onclick={()=>confirmUninstall=false}>{$t('取消')}</Button.Root><Button.Root type="button" class="primary" aria-label={$t('确认卸载 Docling')} disabled={uninstalling} onclick={uninstall}>{$t(uninstalling?'正在卸载…':'卸载')}</Button.Root></div>
 </Modal>{/if}
 

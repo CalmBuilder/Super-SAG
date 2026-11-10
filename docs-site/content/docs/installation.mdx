@@ -1,48 +1,26 @@
 ---
 title: "下载安装"
-description: "桌面端与独立 CLI，两种使用方式。"
+description: "Super-SAG 桌面版及随附 CLI 的安装说明。"
 ---
 
-## 桌面端
+## Windows 桌面版
 
-<ReleaseDownloads language="zh" />
+Super-SAG Windows 安装包正在准备，尚未发布或完成 Windows 实机验收。当前没有 Super-SAG 正式版下载链接。源码构建的准备步骤见[开发指南](/zh/docs/development)。
 
-macOS：打开 DMG，将 SAG Wiki 拖入 Applications，然后启动应用。Windows：运行安装器，按提示完成安装。安装器提供简体中文、繁体中文和英文。
+安装程序随附本地 CLI。完成桌面端的 CLI 初始化后，在新终端运行 `sag --version`。CLI 和桌面版共用本地知识库、配置和服务，无需登录。
 
-[打开最新正式版，查看安装包与更新说明](https://github.com/Zleap-AI/SAG-Wiki/releases/latest)
+<Callout title="原版用户升级">Super-SAG 的覆盖升级仍待使用原版 SAG-Wiki 安装和隔离测试数据在 Windows 实机验收。在验收通过前，请勿覆盖唯一一份业务数据。</Callout>
 
-## 只安装 CLI
+## 关于与更新
 
-需要 Node.js 18 或更高版本。npm 包包含 macOS Apple Silicon 和 Windows x64 原生程序，无需 Rust 或源码编译。
+入口：**设置 → 关于**。这里显示 Super-SAG 版本，以及对 SAG-Wiki 上游项目和开发团队的署名。
 
-```sh
-npm install -g @zleap-ai/sag
-sag --version
-```
+![Super-SAG 关于页面与更新状态](/images/product-about-cn.png)
 
-安装 CLI 不会安装桌面端。继续阅读 [Agent 接入](/zh/docs/agents)或 [CLI 命令](/zh/docs/cli)。
+上图使用虚构数据和浏览器测试替身拍摄，不代表 Windows 安装验收结果。
 
-## 更新
+当前构建尚未配置 Super-SAG 独立签名更新通道，因此不会检查、下载或安装更新。旧版配置会保留，但不会启用其上游更新源。正式更新方式和下载入口将在独立发布与签名链就绪后提供。
 
-桌面端可通过应用内更新获取后续版本，也可手动下载新安装包。npm 安装的 CLI 通过同一条 `npm install -g @zleap-ai/sag` 命令更新。
+## CLI 与 Agent
 
-<Callout title="文件与配置">升级通常保留原文件、知识库配置和会话记录。卸载或清理前，请确认操作的是索引数据还是原始文档。</Callout>
-
-## 关于与软件更新
-
-入口：**设置 → 关于**。这里显示当前安装版本，并提供开源项目与开发公司链接。
-
-![关于页面的版本号与软件更新入口](/images/product-about-cn.png)
-
-应用启动时检查更新，持续运行期间每隔 8 小时再检查一次，也可以点击 **检查更新** 手动查询。发现新版本后会提示，由你选择 **下载更新**；下载完成并通过校验后，按钮变为 **重启并更新**。
-
-- 展开 **更新说明** 查看版本变化，支持标题、列表、加粗和链接。
-- 下载期间可以继续使用应用，关闭设置页不会中断下载。
-- 重启安装前先处理未保存文档，按界面提示保存或取消。
-- 退出整个应用后，未完成的下载需要重新开始。
-- 更新失败时会显示错误，可重新检查或前往 GitHub 下载完整安装包。
-- 更新替换应用文件，保留知识库、会话及本地原文件。
-
-![更新说明中的标题、列表和加粗文字](/images/product-release-notes-cn.png)
-
-关于页显示的是当前安装程序版本。本页打开时读取 GitHub 最新正式版的版本号、安装包地址和实际大小。
+当前尚未发布独立的 Super-SAG npm 包。桌面安装包内的 CLI 可通过桌面初始化安装；不要把上游 npm 包当成 Super-SAG 的发行包。继续阅读 [Agent 接入](/zh/docs/agents)和 [CLI 命令](/zh/docs/cli)。

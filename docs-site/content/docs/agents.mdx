@@ -1,29 +1,18 @@
 ---
 title: "Agent 接入"
-description: "让 Agent 使用 SAG Wiki 的项目检索能力。"
+description: "让 Agent 使用 Super-SAG 的项目检索能力。"
 ---
 
-## 一句话安装
+## 安装随附 Skill
 
-把下面整段发送给 Claude Code、Codex 或 OpenCode：
-
-```text
-请安装 https://github.com/Zleap-AI/SAG-Wiki/blob/main/cli/skills/sag/SKILL.md 并按其中的 setup 流程配置当前项目。
-```
-
-Skill 会指导 Agent 检查 CLI、安装配套 Skill、配置 Jev、添加当前项目并验证一次检索。无需安装桌面端。
-
-<Callout title="密钥配置">首次语义检索需要 Jev API Key。请在本机交互式终端中输入，不要把密钥发送到聊天。</Callout>
-
-## 手动安装 CLI
+安装 Super-SAG 桌面版并完成 CLI 初始化后，在 **设置 → CLI 设置** 选择对应 Agent；也可以在终端执行：
 
 ```sh
-npm install -g @zleap-ai/sag
 sag --version
-sag
+sag install codex
 ```
 
-`sag` 会在首次运行时引导 Jev 配置。已有安装和配置会复用。
+按实际 Agent 将 `codex` 替换为 `claude-code` 或 `opencode`。Skill 和参考文件随 CLI 提供；首次 Jev 密钥在本机终端输入，不要发送到聊天。Super-SAG 独立 npm 包尚未发布。
 
 ## 在当前项目中使用
 
@@ -43,7 +32,7 @@ sag "这个项目如何处理登录与权限？" . -m 5
 | Claude Code | `~/.claude/skills/sag/` |
 | OpenCode | `~/.config/opencode/skills/sag/` |
 
-Skill 需同时包含 `SKILL.md` 和 `references/` 中的配套文件。以 [GitHub Skill](https://github.com/Zleap-AI/SAG-Wiki/tree/main/cli/skills/sag) 为准。
+Skill 需同时包含 `SKILL.md` 和 `references/` 中的配套文件，使用当前 Super-SAG CLI 随附的版本。
 
 ## 与桌面端共用
 

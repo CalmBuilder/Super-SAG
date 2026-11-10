@@ -1,0 +1,61 @@
+{
+  "browser": "Chromium 156.0.8078.4",
+  "reference_commit": "ded11e3f0f4719ea671678447f78be2248c04da2",
+  "checks": [
+    "1600/1280/960: independent pinned desktop reference, current desktop and Web shell geometry; brand and browser window controls",
+    "959/768/480/375/320, including 320x480: no horizontal page overflow; navigation; keyboard sidebar and focus restoration",
+    "resize across 959/960 preserves the desktop collapsed state and clears the mobile overlay",
+    "320 folder dialog controls fit; selected folder write fails visibly; direct synthetic write is rejected",
+    "320 settings entry, common/appearance category navigation and close",
+    "320 search failure is visible and the back button does not cover navigation",
+    "1600/1280 conversation and citation geometry compared with independent desktop reference",
+    "375/320 conversation, source preview, synthetic document and return navigation",
+    "40 long unbroken conversation turns wrap and scroll; missing synthetic source is reported",
+    "1600/1280 conversation search dialog geometry compared with desktop reference",
+    "375/320 history search, keyboard selection, 121 long titles and rejected rename/delete",
+    "1600/1280 question editor geometry compared with desktop reference",
+    "375/320 question edit cancellation, empty/long inputs, rejected regeneration and deletion",
+    "1600/1280 synthetic streaming answer state compared with the desktop reference",
+    "375/320 stream progress, cancellation and ignored late events, 120 chunks, synthetic failure and retry",
+    "1600/1280 synthetic tool progress and approval dialog compared with desktop reference",
+    "375/320 failed tool details, 5000-character approval and rejected mock action; late approval ignored",
+    "1600/1280 synthetic search result and source geometry compared with desktop reference",
+    "768/375/320 search query, source preview and result-list navigation remain usable",
+    "45 synthetic results across three pages, empty result and source-read failure",
+    "1600/1280 synthetic file workspace geometry compared with desktop reference",
+    "768/375/320 folder hierarchy and synthetic Markdown editor; phone toolbar scrolls",
+    "120 long filenames, empty library, source-read failure and rejected save preserve the unsaved editor",
+    "1600/1280 new-document save dialog compared with desktop reference",
+    "375/320 new-document location, blank/reserved/path names, long name, empty library and rejected save",
+    "1600/1280 folder picker geometry compared with the desktop reference",
+    "375/320 folder navigation, multi-selection, hidden items, options, 120 long folders and read/add failures",
+    "1600/1280 general and appearance settings geometry compared with the desktop reference",
+    "375/320 settings categories, theme choices, preview and cancel restoration; Web about branding",
+    "settings numeric bounds, rejected save retains input, and English/dark category navigation",
+    "empty library and 120 long folder names; scrollable sidebar without page overflow",
+    "English/dark brand; synthetic startup failure and retry remains failed"
+  ],
+  "page_errors": [],
+  "limitations": [
+    "Synthetic test fixture, no Web backend or real files",
+    "No Windows native installation or upgrade",
+    "Only workspace, navigation, sidebar and entry points; complete pages remain unaccepted"
+  ],
+  "scope": "synthetic file workspace",
+  "screenshots": {
+    "04-web-files-desktop.png": "5ead0e6b69af60f5c3c44b17eb81b5ce6cf8bd893ee68d02d92d02f9ddc20e51",
+    "04-web-files-phone.png": "bf1f776b3bb9ed4719187efdd0b191e6a1cabbed121178a8faae84477d0196f6",
+    "04-web-editor-phone.png": "c52b91e29f516d299cdf39cb648362b7084f6173b9c4ef07eed62913c3006f8a"
+  },
+  "source_sha256": {
+    "src/App.svelte": "f2d316a1db9b7cdcdd8fe1aca33e0ede823d262cebaf36cb440193cde056f668",
+    "src/components/Settings.svelte": "140de1fe135994668793ae9bdb5b58cdb730f461547afad735a79bba2a3f6130",
+    "src/web/visual-shell.css": "c4285f2cbbb30034ff3c8085bb23999a05625b64ab2c99be8d16d8d3b18d3740",
+    "tests/visual/main.ts": "aecf64c51a0b32377773e45985c500a0f9f50d1cf6c0f49d63b0f9b312093678",
+    "tests/visual/index.html": "d978a0f5042ce86a5952969cd6366580b097680f5d612e62fa6ca2282ef2aadf",
+    "tests/visual/fixture.js": "d3412933232362fe82c58fb9cff4c5b0cbd22c9476129ea5c5cfa3a220002fc8",
+    "tests/browser/reference-main.ts": "d3050b3e048de92537bd64306695b2540cc9e0d62c1766688b0dff9a3240130d",
+    "tests/browser/web_workspace_visual.py": "a58d0c2a9985107e9585a7d3ed6336f8812356807bbddc6c97759b1cd5df23f2",
+    "assets/branding/super-sag-icon.svg": "2a998775192346e4cdb74327d89a1e12f9f4ffee87c0d090a7a1bbedf709859c"
+  }
+}

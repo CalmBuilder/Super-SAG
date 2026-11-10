@@ -1,2 +1,2 @@
-export const appName = 'SAG Wiki';
-export const gitConfig = { user: 'Zleap-AI', repo: 'SAG-Wiki', branch: 'main' };
+export const appName = 'Super-SAG';
+export const gitConfig = { user: 'CalmBuilder', repo: 'Super-SAG', branch: 'main' };

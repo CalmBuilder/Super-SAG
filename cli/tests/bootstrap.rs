@@ -80,7 +80,8 @@ fn desktop_bootstrap_updates_an_owned_binary_when_commands_are_added() {
     bootstrap();
     let record = target.with_extension("sag-install.json");
     let mut value: serde_json::Value = serde_json::from_slice(&fs::read(&record).unwrap()).unwrap();
-    value["version"] = "0.0.9".into();
+    // Match the original Windows package used for the Super-SAG upgrade.
+    value["version"] = "0.2.7".into();
     value["build_id"] = "older-build".into();
     fs::write(record, serde_json::to_vec(&value).unwrap()).unwrap();
     fs::write(&source, "release with new commands").unwrap();

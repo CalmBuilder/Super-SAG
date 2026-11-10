@@ -30,6 +30,14 @@ npm run dev
 
 The frontend server does not provide Tauri's local file and retrieval interfaces. Use the Tauri development entry point to verify complete desktop workflows.
 
+## Web visual preview (in development)
+
+From the repository root, run `npx vite --host 127.0.0.1 --port 1427 --strictPort`, then open `http://127.0.0.1:1427/tests/visual/` on the same machine. The preview reuses the desktop workspace, shows Super-SAG in the sidebar and About panel, and uses a collapsible sidebar on narrow screens. Open `/tests/visual/?fixture=conversation` to inspect a synthetic conversation and citation; open `/tests/visual/?fixture=search` and enter `示例流程` to inspect a preset search result; open `/tests/visual/?fixture=files` to inspect synthetic folders, the document editor and the location picker for a new document. Conversation search, message editing, streaming responses, tool states and approval dialogs in browser regression also use test data and events; they do not execute real tools. The preview is labeled as synthetic data for interface development. It does not connect to real folders, indexes or models and is not a deployable Web service. Unimplemented writes report an error.
+
+Desktop rebranding is in progress; Windows installation and in-place upgrade still require native acceptance. Do not expose the test preview as a service.
+
+The preview changes some `sag.*` local-storage entries for the same browser origin; use a separate browser profile and a dedicated loopback port. On narrow screens, the sidebar folder menu can be obscured, and the drawer can remain open after navigation. This preview is preliminary work before Windows acceptance. Formal Web comparisons must use the accepted Super-SAG Windows installer as the baseline.
+
 ## Build the CLI
 
 ```sh
@@ -57,11 +65,16 @@ npm run tauri build
 
 On Windows:
 
-```sh
-npm run package:windows
+```powershell
+git submodule update --init --recursive
+npm.cmd ci
+npm.cmd run check
+npm.cmd run package:windows
 ```
 
-Use the system dependencies and signing configuration for the target platform. Distributable artifacts and the native CLI come from the same source version. For npm distribution, see [npm publishing](https://github.com/Zleap-AI/SAG-Wiki/blob/main/docs/en/npm-publishing.md).
+Use Windows x64, Node.js, Rust stable with the `x86_64-pc-windows-msvc` target, Microsoft C++ build tools and WebView2. Building also needs network access for dependencies and the NSIS toolchain. Stop and investigate if a command fails. The installer is expected under `src-tauri/target/release/bundle/nsis/`; use the actual build output.
+
+A successful build is not Windows acceptance. Verify fresh installation and the original-app upgrade in an isolated environment first, recording the installer SHA-256, settings and original files. Do not overwrite the only copy of production data. A separate Super-SAG npm package and signed update channel have not been published.
 
 ## Code checks
 

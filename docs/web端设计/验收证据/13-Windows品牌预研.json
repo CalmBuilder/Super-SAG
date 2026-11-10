@@ -1,0 +1,96 @@
+{
+  "scope": "Chromium desktop frontend with synthetic Tauri fixture; not native Windows or business acceptance",
+  "browser": "156.0.8078.4",
+  "checks": [
+    {
+      "language": "zh-CN",
+      "width": 960,
+      "height": 600,
+      "theme": "light",
+      "status": "passed"
+    },
+    {
+      "language": "zh-CN",
+      "width": 1280,
+      "height": 720,
+      "theme": "light",
+      "status": "passed"
+    },
+    {
+      "language": "zh-CN",
+      "width": 1920,
+      "height": 1080,
+      "theme": "dark",
+      "status": "passed"
+    },
+    {
+      "language": "zh-CN",
+      "case": "first-run guide",
+      "status": "passed"
+    },
+    {
+      "language": "en",
+      "width": 960,
+      "height": 600,
+      "theme": "light",
+      "status": "passed"
+    },
+    {
+      "language": "en",
+      "width": 1280,
+      "height": 720,
+      "theme": "light",
+      "status": "passed"
+    },
+    {
+      "language": "en",
+      "width": 1920,
+      "height": 1080,
+      "theme": "dark",
+      "status": "passed"
+    },
+    {
+      "language": "en",
+      "case": "first-run guide",
+      "status": "passed"
+    }
+  ],
+  "page_errors": [],
+  "source_sha256": {
+    "src/App.svelte": "d1844f38afac6c786167d03d9c74a6b97fa2c5b703ae590d7d42e92b432217bc",
+    "src/components/Settings.svelte": "794fb0021a078324b1f6060cd1617741c040a800c34bf2d65b18d91b3e310e0d",
+    "src/components/Onboarding.svelte": "d227c3809ec1fbc67d45be268d230b68ce5cbca73552547239696229a3e981e5",
+    "src/components/AppUpdates.svelte": "eb8f181b8223c2a77b0f148bb57541523d368fbafa56549472a516af545e9772",
+    "src/components/UpdateNotification.svelte": "e1a1ae31be7629440bb786e1c1b542e2acad84c590c742699416b4dd5fcab446",
+    "src/lib/icons.ts": "2f044e25fa3f09d4833a750b327fc2b259c94d187bcd41b92e9b8e4acb456dcf",
+    "src/lib/updates.ts": "c2b9dd3f8002a5378bc9735f9e066b0c91769e4b4c6cde749434075e7ac75319",
+    "src/lib/locales/en.json": "63c07cd0d48050072f051a2193a792defc9f749472aa3a3f10aa58e70dc375de",
+    "src-tauri/tauri.conf.json": "d63e977d1ff0b24c038c88ba2bf3f165b9d511dadaf71611fbf631a2333382cd",
+    "assets/branding/super-sag-icon.svg": "2a998775192346e4cdb74327d89a1e12f9f4ffee87c0d090a7a1bbedf709859c",
+    "tests/visual/fixture.js": "d3412933232362fe82c58fb9cff4c5b0cbd22c9476129ea5c5cfa3a220002fc8",
+    "tests/browser/windows_brand.py": "a2b79d53511e1b011b5b3f072eb152682de4759cf8436020395ac1a0a2ccec4f",
+    "src-tauri/tauri.windows.conf.json": "f9a2686bad7eeea250da16daa4611f2f6f55ae00ecbb048e4a1453dd39266009",
+    "src-tauri/windows/installer.nsi": "44537fd02030c31b31a3552a099a51bd6aa099b4a77e2e2a3ed5dd52a5ce4a3e",
+    "src-tauri/windows/installer-hooks.nsh": "75eb24d30584bd9fd6fefe23fad60048b8332337b0cef208bb3c51af4ec40fd4",
+    "src-tauri/icons/super-sag/icon.ico": "38617b031da1c55af16da5032ed674faa64d8c822506775999ebc4068b1a10a7",
+    "scripts/check-windows-template.mjs": "2574e70e20f6d003a11a7f91c77de0d0c6259bf6993f84d4109f08bfe2fae7ee",
+    "protocol/src/types.rs": "3984f60d8d80e148f06e7e2352e9202a1d10462089544214d1dc7e3baf0343c9",
+    "cli/tests/bootstrap.rs": "54ab93d165740ec518018f0490b06a11094d31b2c4e8ce8482f747d291c4ff97"
+  },
+  "screenshots": {
+    "13-windows-brand-about-en.png": "bf83a23cbe5895e8d0dccbce91f05623cadb098eb3d27a1f95d562c7a694cb4e",
+    "13-windows-brand-about-zh-CN.png": "2cbfb0afe495af2222d8c265b523f8bddf050839110ab85577bb233e9e46d41e",
+    "13-windows-brand-home-en.png": "5e829d660b0809afd0b05c3858db69bf30fb975e113ec9e14f124037858b3e79",
+    "13-windows-brand-home-zh-CN.png": "bfb5f478db589a4b3881c0c03e43905fab0fe4a75bb742575022e94ef129c35d"
+  },
+  "other_checks": {
+    "frontend": "92 Vitest files, 698 tests passed; frontend production build passed",
+    "protocol": "9 Rust protocol tests passed on Linux",
+    "cli": "25 isolated Linux CLI install and bootstrap tests passed, including simulated 0.2.7 upgrade",
+    "windows_cross_check": "Desktop and CLI cargo check passed for x86_64-pc-windows-gnu on Linux; not execution on Windows",
+    "installer_template": "Pinned Tauri CLI and NSIS compiled the current template and hooks using synthetic executable and resources in an isolated temporary directory; this output is not a product installer",
+    "documentation": "Bilingual documentation build and Chromium page, link, image and search checks passed",
+    "limitations": "No real Windows installer, Windows native execution, upgrade, user data or model acceptance; independent signed updater is disabled",
+    "windows_configuration": "Windows platform config includes both main and quick-search windows; preflight exercises missing-window, tool-version and legacy-identity rejection."
+  }
+}

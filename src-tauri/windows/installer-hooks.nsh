@@ -64,7 +64,35 @@
   Pop $0
 !macroend
 
+; Rename a legacy shortcut only when it targets this exact installation. Never
+; overwrite or delete a same-named shortcut that points somewhere else.
+!macro SAG_MIGRATE_OLD_SHORTCUT oldShortcut newShortcut
+  Push $0
+  Push $1
+  !insertmacro IsShortcutTarget "${oldShortcut}" "$INSTDIR\${MAINBINARYNAME}.exe"
+  Pop $0
+  ${If} $0 = 1
+    ${If} ${FileExists} "${newShortcut}"
+      !insertmacro IsShortcutTarget "${newShortcut}" "$INSTDIR\${MAINBINARYNAME}.exe"
+      Pop $1
+      ${If} $1 = 1
+        Delete "${oldShortcut}"
+      ${Else}
+        DetailPrint "Existing Super-SAG shortcut points elsewhere; retaining the old shortcut."
+      ${EndIf}
+    ${Else}
+      Rename "${oldShortcut}" "${newShortcut}"
+    ${EndIf}
+  ${EndIf}
+  Pop $1
+  Pop $0
+!macroend
+
 !macro NSIS_HOOK_POSTINSTALL
+  !insertmacro SAG_MIGRATE_OLD_SHORTCUT "$DESKTOP\SAG Wiki.lnk" "$DESKTOP\${PRODUCTNAME}.lnk"
+  !insertmacro SAG_MIGRATE_OLD_SHORTCUT "$SMPROGRAMS\SAG Wiki.lnk" "$SMPROGRAMS\${PRODUCTNAME}.lnk"
+  !insertmacro SAG_MIGRATE_OLD_SHORTCUT "$SMPROGRAMS\$AppStartMenuFolder\SAG Wiki.lnk" "$SMPROGRAMS\$AppStartMenuFolder\${PRODUCTNAME}.lnk"
   !insertmacro SAG_UPDATE_SHORTCUT_ICON "$DESKTOP\${PRODUCTNAME}.lnk"
   !insertmacro SAG_UPDATE_SHORTCUT_ICON "$SMPROGRAMS\${PRODUCTNAME}.lnk"
+  !insertmacro SAG_UPDATE_SHORTCUT_ICON "$SMPROGRAMS\$AppStartMenuFolder\${PRODUCTNAME}.lnk"
 !macroend

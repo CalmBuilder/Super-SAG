@@ -5,6 +5,8 @@
  import type {UpdateSettings} from '../lib/types';
  export let config:UpdateSettings;
  export let onBeforeInstall:()=>Promise<boolean>=async()=>true;
+ // Kept disabled until Super-SAG has its own signed update channel.
+ export let enabled=false;
  let confirming=false;
  $: state=$updateState.key===updateKey(config)?$updateState:null;
  $: transfer=$updateDownload.key===updateKey(config)?$updateDownload:null;
@@ -21,6 +23,7 @@
  }
 </script>
 
+{#if enabled}
 <section class="settings-group app-updates" aria-label={$t('软件更新')}>
  <div class="setting-row">
   <div><strong>{$t('软件更新')}</strong><p>{$t('启动时及运行期间每隔 8 小时检查，发现新版后可下载并重启安装。')}</p></div>
@@ -54,6 +57,11 @@
   {#if transfer?.error&&transfer.stage==='idle'}<Button.Root type="button" class="outline update-recheck" disabled={state?.checking} onclick={()=>checkUpdates(config)}>{$t('重新检查更新')}</Button.Root>{/if}
  </div>
 </section>
+{:else}
+<section class="settings-group app-updates" aria-label={$t('软件更新')}>
+ <div class="setting-row"><div><strong>{$t('软件更新')}</strong><p>{$t('当前构建尚未配置 Super-SAG 独立签名更新，暂不检查或安装更新。')}</p></div></div>
+</section>
+{/if}
 
 <style>
  .update-content{padding:0 18px 18px}

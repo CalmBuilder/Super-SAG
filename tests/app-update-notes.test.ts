@@ -16,7 +16,7 @@ afterEach(async()=>{await unmount(app);document.body.innerHTML='';vi.clearAllMoc
 it('renders release notes as formatted Markdown and keeps unsafe HTML out',async()=>{
  const notes='## 0.2.6\n\n- **快捷搜索**：支持独立窗口。\n- 查看 [使用指南](https://example.com/guide)。\n\n`Ctrl+Shift+Space`\n\n<script>alert("release notes")</script>';
  invoke.mockResolvedValueOnce({current_version:'0.2.5',latest_version:'0.2.6',available:true,notes,download_url:null});
- app=mount(AppUpdates,{target:document.body,props:{config:{...defaultUpdateSettings}}});
+ app=mount(AppUpdates,{target:document.body,props:{enabled:true,config:{...defaultUpdateSettings}}});
  document.querySelector<HTMLButtonElement>('button')!.click();
  await vi.waitFor(()=>expect(document.querySelector('.update-notes')).not.toBeNull());
  const notesElement=document.querySelector('.update-notes')!;

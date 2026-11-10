@@ -3,7 +3,7 @@ title: "Architecture"
 description: "How the desktop, CLI and local service work together."
 ---
 
-SAG Wiki is a local-file knowledge base. The desktop UI and CLI connect to the same standalone background service, while original files stay in the user's directories. Indexing, browsing and local matching work offline. Semantic retrieval and Q&A call the model services configured by the user.
+Super-SAG is a local-file knowledge base. The desktop UI and CLI connect to the same standalone background service, while original files stay in the user's directories. Indexing, browsing and local matching work offline. Semantic retrieval and Q&A call the model services configured by the user.
 
 ## Modules
 
@@ -111,4 +111,4 @@ Closing the window hides the desktop, and quitting it also leaves the background
 
 ## Dependencies and distribution
 
-The core is linked only into the `sag` executable. Desktop depends only on the protocol and client. Desktop packages bundle native CLIs from the same build, while npm packages distribute only the CLI launcher and prebuilt native programs. See the [development guide](/en/docs/development) for builds and [npm publishing](https://github.com/Zleap-AI/SAG-Wiki/blob/main/docs/en/npm-publishing.md) for distribution. Dependency licenses are stored in `src-tauri/licenses/`.
+The core is linked only into the `sag` executable. Desktop depends only on the protocol and client. Desktop packages bundle native CLIs from the same build; no standalone Super-SAG npm package has been published. See the [development guide](/en/docs/development) for builds. Dependency licenses are stored in `src-tauri/licenses/`.

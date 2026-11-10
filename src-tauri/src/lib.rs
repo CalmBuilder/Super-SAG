@@ -255,14 +255,14 @@ fn tray_menu(app: &tauri::AppHandle, language: &str) -> tauri::Result<Menu<tauri
     let open = MenuItem::with_id(
         app,
         "sag-open",
-        if english { "Open SAG Wiki" } else { "打开 SAG Wiki" },
+        if english { "Open Super-SAG" } else { "打开 Super-SAG" },
         true,
         None::<&str>,
     )?;
     let quit = MenuItem::with_id(
         app,
         "sag-quit",
-        if english { "Quit SAG Wiki" } else { "退出 SAG Wiki" },
+        if english { "Quit Super-SAG" } else { "退出 Super-SAG" },
         true,
         None::<&str>,
     )?;
@@ -530,7 +530,7 @@ pub fn run() {
             TrayIconBuilder::with_id("main")
                 .icon(icon)
                 .icon_as_template(cfg!(target_os = "macos"))
-                .tooltip("SAG Wiki")
+                .tooltip("Super-SAG")
                 .menu(&tray_menu(app.handle(), language)?)
                 .show_menu_on_left_click(!cfg!(target_os = "windows"))
                 .on_menu_event(|app, event| match event.id.as_ref() {
@@ -676,7 +676,7 @@ pub fn run() {
             get_service_info
         ])
         .build(tauri::generate_context!())
-        .expect("无法启动 SAG Wiki");
+        .expect("无法启动 Super-SAG");
     app.run(|app, event| match event {
         tauri::RunEvent::ExitRequested {
             code: None, api, ..

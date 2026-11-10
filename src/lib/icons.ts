@@ -1,4 +1,4 @@
-import brandIconUrl from '../assets/brand-icon.png';
+import brandIconUrl from '../../assets/branding/super-sag-icon.svg?url';
 import {
  ArrowLeft, ArrowLeftRight, ArrowRight, ArrowUp, Bold, Check, ChevronDown, ChevronRight, ChevronsLeft, CircleHelp, CodeXml, Copy,
  Download, Ellipsis, FileText, Folder, FolderUp, Globe, History, Info, Italic, List, ListOrdered,

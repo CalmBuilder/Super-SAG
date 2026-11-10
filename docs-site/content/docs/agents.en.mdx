@@ -1,29 +1,18 @@
 ---
 title: "Agents"
-description: "Give your agent access to SAG Wiki project search."
+description: "Give your agent access to Super-SAG project search."
 ---
 
-## One setup instruction
+## Install the bundled Skill
 
-Send this entire instruction to Claude Code, Codex or OpenCode:
-
-```text
-Install https://github.com/Zleap-AI/SAG-Wiki/blob/main/cli/skills/sag/SKILL.md and follow its setup flow for my current project.
-```
-
-The Skill guides the agent through checking the CLI, installing all Skill files, configuring Jev, adding the current project and verifying a search. The desktop app is optional.
-
-<Callout title="API key setup">Semantic search requires a Jev API key. Enter it in a local interactive terminal, never in chat.</Callout>
-
-## Install the CLI manually
+After installing Super-SAG desktop and initializing its CLI, choose the agent under **Settings → CLI settings**, or run:
 
 ```sh
-npm install -g @zleap-ai/sag
 sag --version
-sag
+sag install codex
 ```
 
-Running `sag` for the first time guides Jev setup. Existing installations and settings are reused.
+Replace `codex` with `claude-code` or `opencode` for that agent. The CLI includes the Skill and reference files. Enter a first Jev key in a local terminal, never in chat. A standalone Super-SAG npm package has not been published.
 
 ## Use it in your project
 
@@ -43,7 +32,7 @@ Adjust `--types` to match your project. Wait for indexing before searching. Resu
 | Claude Code | `~/.claude/skills/sag/` |
 | OpenCode | `~/.config/opencode/skills/sag/` |
 
-Include `SKILL.md` and all companion files under `references/`. Use the [GitHub Skill](https://github.com/Zleap-AI/SAG-Wiki/tree/main/cli/skills/sag) as the canonical source.
+Include `SKILL.md` and all companion files under `references/` from the installed Super-SAG CLI.
 
 ## Shared with the desktop app
 

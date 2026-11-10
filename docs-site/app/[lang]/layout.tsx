@@ -4,7 +4,7 @@ import { translations } from '@/lib/layout.shared';
 import { notFound } from 'next/navigation';
 import { i18n } from '@/lib/i18n';
 import '../global.css';
-export const metadata = { icons: { icon: '/favicon.png' }, title: { default: 'SAG Wiki · 文档', template: '%s | SAG Wiki' }, description: 'SAG Wiki 使用文档：本地知识库、精准检索、引用问答与 Agent CLI。' };
+export const metadata = { icons: { icon: '/favicon.png' }, title: { default: 'Super-SAG · 文档', template: '%s | Super-SAG' }, description: 'Super-SAG 使用文档：本地知识库、精准检索、引用问答与 Agent CLI。' };
 export default async function Layout({ children, params }: { children: React.ReactNode; params: Promise<{lang:string}> }) {
   const { lang } = await params;
   if (lang !== 'zh' && lang !== 'en') notFound();

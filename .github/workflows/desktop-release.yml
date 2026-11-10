@@ -32,6 +32,8 @@ env:
 jobs:
   validate:
     name: Validate release source
+    # Retained as upstream reference; Super-SAG has no configured release channel.
+    if: github.repository == 'Zleap-AI/SAG-Wiki'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     outputs:
