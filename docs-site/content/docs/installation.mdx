@@ -1,0 +1,26 @@
+---
+title: "下载安装"
+description: "Super-SAG 桌面版及随附 CLI 的安装说明。"
+---
+
+## Windows 桌面版
+
+当前版本为 `v0.1.0`。Windows 安装、业务功能和保留数据的升级仍待实机验收；安装包尚未正式发布，没有正式版下载链接。源码构建的准备步骤见[开发指南](/zh/docs/development)。
+
+安装程序随附本地 CLI。完成桌面端的 CLI 初始化后，在新终端运行 `super-sag --version`。CLI 和桌面版共用本地知识库、配置和服务，无需登录。
+
+<Callout title="已有数据升级">覆盖升级仍待使用隔离测试数据在 Windows 实机验收。安装前请备份；卸载界面的“删除应用程序数据”会影响配置、索引和会话。</Callout>
+
+## 关于与更新
+
+入口：**设置 → 关于**。这里显示 Super-SAG 版本和更新状态。
+
+![Super-SAG 关于页面与更新状态](/images/product-about-cn.png)
+
+上图使用虚构数据和浏览器测试替身拍摄，不代表 Windows 安装验收结果。
+
+当前构建尚未配置 Super-SAG 独立签名更新通道，因此不会检查、下载或安装更新。旧版配置会保留，但不会启用旧更新源。正式更新方式和下载入口将在独立发布与签名链就绪后提供。
+
+## CLI 与 Agent
+
+当前尚未发布独立的 Super-SAG npm 包。桌面安装包内的 CLI 可通过桌面初始化安装。继续阅读 [Agent 接入](/zh/docs/agents)和 [CLI 命令](/zh/docs/cli)。

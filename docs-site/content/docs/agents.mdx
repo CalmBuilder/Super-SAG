@@ -1,0 +1,69 @@
+---
+title: "Agent 接入"
+description: "让 Agent 使用 Super-SAG 的项目检索能力。"
+---
+
+## 安装随附 Skill
+
+安装 Super-SAG 桌面版并完成 CLI 初始化后，在 **设置 → CLI 设置** 选择对应 Agent；也可以在终端执行：
+
+```sh
+super-sag --version
+super-sag install codex
+```
+
+按实际 Agent 将 `codex` 替换为 `claude-code` 或 `opencode`。Skill 和参考文件随 CLI 提供；首次 Jev 密钥在本机终端输入，不要发送到聊天。Super-SAG 独立 npm 包尚未发布。
+
+## 在当前项目中使用
+
+```sh
+super-sag add --types md,txt,html,py,js,ts,tsx,json,yaml
+super-sag check
+super-sag "这个项目如何处理登录与权限？" . -m 5
+```
+
+按项目的实际文件类型调整 `--types`。待索引就绪后再搜索。结果包含文件、位置和相关内容，Agent 可据此进一步阅读原文。
+
+## Skill 安装位置
+
+| Agent | 用户级目录 |
+| --- | --- |
+| Codex | `~/.agents/skills/super-sag/` |
+| Claude Code | `~/.claude/skills/super-sag/` |
+| OpenCode | `~/.config/opencode/skills/super-sag/` |
+
+Skill 需同时包含 `SKILL.md` 和 `references/` 中的配套文件，使用当前 Super-SAG CLI 随附的版本。
+
+## 与桌面端共用
+
+Agent 通过 CLI 调用 SAG。桌面与 CLI 共用配置、目录和索引，无需重复建库。使用相关片段开展任务，可以减少把整份文档直接放入上下文的需要；具体 Token 消耗与效率取决于任务和 Agent 的用法。
+
+## 桌面中的 CLI 设置
+
+入口：右上角的插头图标 **接入 Agent**，或 **设置 → CLI 设置**。悬停在图标上可查看名称。
+
+![CLI 服务与 Agent Skill 安装入口](/images/product-cli-settings-cn.png)
+
+截图使用虚构数据和浏览器测试替身，仅用于说明界面。
+
+| 项目 | 作用 | 如何使用 |
+| --- | --- | --- |
+| 启用 CLI | 允许 CLI 访问共享本地服务 | 首次桌面启动会自动安装并启用；修改开关后保存设置。 |
+| 测试连接 | 检查 CLI 与服务连接状态 | 开关有未保存变化时先保存，再测试。连接成功不等于项目已经完成索引。 |
+| Claude Code / Codex / OpenCode 安装 | 安装对应 Agent 的 Super-SAG Skill | 点击安装；已安装时可卸载。新开 Agent 会话后加载。 |
+| 复制安装命令 | 复制 `super-sag install` 命令 | 在本地终端运行，或交给对应 Agent 执行。 |
+| 其他 | 复制本地 Skill 安装指令 | 点击代码块旁的复制按钮，发送给同一台电脑上的 Agent。 |
+| Skill 安装指南 | 显示安装步骤和实际保存位置 | 需要确认 Skill 装到哪里时展开。 |
+| CLI 使用指南 | 查看基本命令、项目范围与状态检查 | 更完整说明见 [CLI 命令](/zh/docs/cli)。 |
+
+“其他”一栏提示“复制以下指令，发送给你的 Agent 完成接入。”点击代码块旁的复制图标即可。端口以界面显示为准：
+
+```text
+set up: http://127.0.0.1:端口/super-sag.md
+```
+
+Agent 可读取此链接及配套文档，复用本机 CLI 与配置。访问时需保持本地服务运行；服务重启后请重新复制当前链接。
+
+不需要给每个目录另选 CLI 授权范围；搜索仍限于当前路径内已加入知识库的内容，并遵守排除规则。关闭 CLI 开关会影响 Agent 接入，不会删除原文件或已建索引。
+
+从 GitHub 链接安装时，按链接中的最新 setup 流程获取完整 Skill；桌面附带的 Skill 是该安装版本内置的副本。

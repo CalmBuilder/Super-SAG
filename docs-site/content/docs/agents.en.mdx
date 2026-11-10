@@ -1,0 +1,69 @@
+---
+title: "Agents"
+description: "Give your agent access to Super-SAG project search."
+---
+
+## Install the bundled Skill
+
+After installing Super-SAG desktop and initializing its CLI, choose the agent under **Settings → CLI settings**, or run:
+
+```sh
+super-sag --version
+super-sag install codex
+```
+
+Replace `codex` with `claude-code` or `opencode` for that agent. The CLI includes the Skill and reference files. Enter a first Jev key in a local terminal, never in chat. A standalone Super-SAG npm package has not been published.
+
+## Use it in your project
+
+```sh
+super-sag add --types md,txt,html,py,js,ts,tsx,json,yaml
+super-sag check
+super-sag "How does this project handle login and permissions?" . -m 5
+```
+
+Adjust `--types` to match your project. Wait for indexing before searching. Results identify files, source locations and relevant content that the agent can read further.
+
+## Skill locations
+
+| Agent | User-level directory |
+| --- | --- |
+| Codex | `~/.agents/skills/super-sag/` |
+| Claude Code | `~/.claude/skills/super-sag/` |
+| OpenCode | `~/.config/opencode/skills/super-sag/` |
+
+Include `SKILL.md` and all companion files under `references/` from the installed Super-SAG CLI.
+
+## Shared with the desktop app
+
+Agents call SAG through the CLI. Desktop and CLI share configuration, folders and indexes, so indexing is not duplicated. Retrieving relevant passages can reduce the need to put entire documents in context. Actual token use and efficiency depend on the task and agent workflow.
+
+## CLI settings in the desktop app
+
+![CLI service and Agent Skill installation](/images/product-cli-settings-en.png)
+
+The screenshot uses synthetic data and a browser test fixture to illustrate the interface.
+
+Location: the plug icon for **Connect Agent** at the top right, or **Settings → CLI settings**. Hover over the icon to see its name.
+
+| Item | Purpose | Usage |
+| --- | --- | --- |
+| Enable CLI | Allow CLI access to the shared local service | First desktop launch installs and enables it. Save after changing the switch. |
+| Test connection | Check CLI-to-service connectivity | Save switch changes first. Connectivity does not prove project indexing is complete. |
+| Install for Claude Code / Codex / OpenCode | Install that agent's Super-SAG Skill | Select Install; installed integrations can be removed. Start a new agent session to load the Skill. |
+| Copy installation command | Copy the corresponding `super-sag install` command | Run it locally or give it to the agent. |
+| Other | Copy a local Skill setup instruction | Use the copy button beside the code block and send it to an agent on the same computer. |
+| Skill installation guide | Show setup steps and the actual location | Expand to inspect where files are installed. |
+| CLI usage guide | Basic commands, project scope and status checks | See the full [CLI reference](/en/docs/cli). |
+
+The **Other** row says “Copy the instruction below and send it to your agent to complete setup.” Use the copy icon beside the code block. The instruction uses the actual port shown in settings:
+
+```text
+set up: http://127.0.0.1:PORT/super-sag.md
+```
+
+The agent can read this link and its companion documents while reusing the local CLI and configuration. Keep the local service running; copy the current link again after restarting the service.
+
+No separate per-folder CLI authorization selection is required. Search still covers only indexed content beneath the current path and respects exclusions. Disabling CLI affects agent access without deleting originals or indexes.
+
+When installing from GitHub, follow the linked current setup flow and fetch every Skill file. A desktop-bundled Skill is a snapshot shipped with that app version.

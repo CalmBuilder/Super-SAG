@@ -1,0 +1,67 @@
+{
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Super-SAG",
+        "width": 1280,
+        "height": 850,
+        "minWidth": 960,
+        "minHeight": 600,
+        "decorations": false
+      },
+      {
+        "label": "quick-search",
+        "title": "Super-SAG — Quick Search",
+        "url": "index.html?quick-search",
+        "width": 900,
+        "height": 520,
+        "visible": false,
+        "resizable": false,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "center": true
+      }
+    ]
+  },
+  "bundle": {
+    "targets": [
+      "nsis"
+    ],
+    "resources": {
+      "licenses/LUCIDE.txt": "licenses/LUCIDE.txt",
+      "licenses/TAURI-MIT.txt": "licenses/TAURI-MIT.txt",
+      "licenses/BITS-UI.txt": "licenses/BITS-UI.txt",
+      "licenses/SHADCN-SVELTE.txt": "licenses/SHADCN-SVELTE.txt",
+      "licenses/MORPHDOM.txt": "licenses/MORPHDOM.txt",
+      "licenses/GRAPH-VIEW.txt": "licenses/GRAPH-VIEW.txt",
+      "licenses/ANYDOC.txt": "licenses/ANYDOC.txt",
+      "licenses/TEXTFOLD.txt": "licenses/TEXTFOLD.txt",
+      "icons/super-sag/icon.ico": "icons/sag-rounded-v2.ico",
+      "bin/sag.exe": "bin/sag.exe",
+      "licenses/PELE.txt": "licenses/PELE.txt",
+      "clipper/sag-web-clipper-chrome.zip": "clipper/sag-web-clipper-chrome.zip"
+    },
+    "windows": {
+      "nsis": {
+        "languages": [
+          "English",
+          "SimpChinese",
+          "TradChinese"
+        ],
+        "displayLanguageSelector": true,
+        "template": "windows/installer.nsi",
+        "installerHooks": "windows/installer-hooks.nsh",
+        "installerIcon": "icons/super-sag/icon.ico",
+        "uninstallerIcon": "icons/super-sag/icon.ico"
+      }
+    },
+    "icon": [
+      "icons/super-sag/32x32.png",
+      "icons/super-sag/128x128.png",
+      "icons/super-sag/128x128@2x.png",
+      "icons/super-sag/icon.ico"
+    ]
+  }
+}
