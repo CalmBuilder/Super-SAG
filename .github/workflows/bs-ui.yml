@@ -2,7 +2,7 @@ name: Super-SAG browser workspace checks
 
 on:
   push:
-    branches: [main, 'validation/**']
+    branches: [main, 'validation/**', 'validation-browser/**']
   pull_request:
     branches: [main]
   workflow_dispatch:

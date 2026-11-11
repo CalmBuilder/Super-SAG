@@ -121,6 +121,26 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
             record('120 long folder names with scrolling')
             context.close()
 
+            context, page = new_page(scenario='tree')
+            root = page.get_by_role('button', name='展开示例知识库')
+            root.click()
+            expect(page.get_by_role('button', name='展开一级')).to_be_visible()
+            page.get_by_role('button', name='展开一级').click()
+            expect(page.get_by_role('button', name='展开二级')).to_be_visible()
+            page.get_by_role('button', name='折叠一级').click()
+            page.get_by_role('button', name='折叠示例知识库').click()
+            expect(page.locator('.tree-row')).to_have_count(1)
+            record('nested folder expansion and collapse')
+            context.close()
+
+            context, page = new_page(scenario='tree-error')
+            root = page.get_by_role('button', name='展开示例知识库')
+            root.click()
+            expect(page.locator('#notice')).to_contain_text('测试读取目录失败')
+            expect(root).to_have_attribute('aria-expanded', 'false')
+            record('folder expansion failure preserves collapsed state')
+            context.close()
+
             for width in (320, 375, 768, 959, 960):
                 context, page = new_page(width=width)
                 switcher = page.locator('.workspace-switch')

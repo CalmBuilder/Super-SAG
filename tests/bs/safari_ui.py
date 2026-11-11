@@ -122,6 +122,23 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
         no_errors()
         record('120 long folder names with scrolling')
 
+        visit(scenario='tree')
+        css('[aria-label="展开示例知识库"]').click()
+        css('[aria-label="展开一级"]').click()
+        wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, '[aria-label="展开二级"]')))
+        css('[aria-label="折叠一级"]').click()
+        css('[aria-label="折叠示例知识库"]').click()
+        wait.until(lambda current: len(current.find_elements(By.CSS_SELECTOR, '.tree-row')) == 1)
+        no_errors()
+        record('nested folder expansion and collapse')
+
+        visit(scenario='tree-error')
+        css('[aria-label="展开示例知识库"]').click()
+        wait.until(EC.text_to_be_present_in_element((By.CSS_SELECTOR, '#notice'), '测试读取目录失败'))
+        assert css('[aria-label="展开示例知识库"]').get_attribute('aria-expanded') == 'false'
+        no_errors()
+        record('folder expansion failure preserves collapsed state')
+
         for width in (320, 375, 768, 959, 960):
             driver.set_window_rect(width=width, height=800)
             visit()
