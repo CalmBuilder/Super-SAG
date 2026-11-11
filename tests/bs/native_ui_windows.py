@@ -6,6 +6,7 @@ import time
 from urllib.parse import urlsplit
 from urllib.request import urlopen
 from playwright.sync_api import expect, sync_playwright
+from layout_probe import workspace_layout
 
 port = int(os.environ['BS_NATIVE_DEBUG_PORT'])
 endpoint = f'http://127.0.0.1:{port}'
@@ -39,12 +40,15 @@ with sync_playwright() as playwright:
     expect(page.locator('.welcome h1')).to_have_text('向你的文件提问')
     output = Path(os.environ['RUNNER_TEMP']) / 'bs-native-ui-evidence'
     output.mkdir(exist_ok=True)
+    layouts = {'ask': workspace_layout(page)}
     page.screenshot(path=str(output / 'windows-ask.png'), animations='disabled')
     page.get_by_role('button', name='搜索', exact=True).click()
     expect(page.locator('.search-page h1')).to_have_text('搜索你的文件')
+    layouts['search'] = workspace_layout(page)
     page.screenshot(path=str(output / 'windows-search.png'), animations='disabled')
     page.get_by_role('button', name='文件', exact=True).click()
     expect(page.locator('.content')).to_contain_text('已索引文件')
+    layouts['files'] = workspace_layout(page)
     page.screenshot(path=str(output / 'windows-files.png'), animations='disabled')
     page.get_by_role('button', name='问答', exact=True).click()
     expect(page.locator('.welcome h1')).to_have_text('向你的文件提问')
@@ -53,6 +57,6 @@ with sync_playwright() as playwright:
     page.get_by_role('button', name='关闭设置').click()
     expect(page.get_by_role('dialog')).to_have_count(0)
     report = {'status':'passed', 'scope':'installed Windows app WebView navigation and settings',
-              'url':page.url, 'checks':['ask','search','files','settings open and close']}
+              'url':page.url, 'checks':['ask','search','files','settings open and close'], 'layout':layouts}
     (output / 'result.json').write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     print(json.dumps(report, ensure_ascii=False))
