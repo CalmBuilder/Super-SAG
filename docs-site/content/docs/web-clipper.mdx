@@ -5,7 +5,7 @@ description: 独立保存网页为本地 Markdown，可选加入 Super-SAG 索�
 
 网页剪藏扩展将当前网页正文保存为本地 Markdown。无需连接码，无需运行 Super-SAG，也无需安装 Obsidian 或配置模型。
 
-当前 Windows 构建配置包含 Chrome / Edge 扩展压缩包，仍待 Windows 实机验收。尚无已发布的 Super-SAG 扩展或经验证的 Safari 安装包。
+当前 Windows 构建配置包含 Chrome / Edge 扩展压缩包；用户反馈 Windows 全部业务已通过实机测试。尚无已发布的独立 Super-SAG 扩展或经验证的 Safari 安装包。
 
 ![网页剪藏设置](/images/product-web-clipper-zh.jpg)
 
@@ -56,7 +56,7 @@ Chrome / Edge 使用浏览器的文件夹选择机制：首次点击 **保存** 
 
 Safari 在下拉框中显示完整路径，Chrome / Edge 显示浏览器提供的目录名称；默认目录显示已知的相对位置。若需要重新选择目录，点击 **选择文件夹** 或 **更换文件夹**，再点击 **保存设置**。Safari 使用扩展自带的本地组件记住所选目录，不连接 Super-SAG。
 
-Windows 使用系统的“文档”目录创建 `super-sag\clippings`，无需填写 macOS 路径。保存到其他盘符或含中文、空格的目录时，请用扩展的文件夹选择器选择目录。Windows 安装包附带 Chrome / Edge 扩展；目前已检查打包配置与文件名规则，尚未完成 Windows 实机保存验证。
+Windows 使用系统的“文档”目录创建 `super-sag\clippings`，无需填写 macOS 路径。保存到其他盘符或含中文、空格的目录时，请用扩展的文件夹选择器选择目录。Windows 安装包附带 Chrome / Edge 扩展；用户已反馈 Windows 全部业务通过，剪藏保存的具体操作明细尚未单独记录。
 
 扩展还保留可选的 **下载目录** 模式：Chrome / Edge 使用浏览器下载目录，并可勾选 **每次选择保存位置**；Safari 使用系统下载目录。此模式默认子文件夹为 `clippings`，可填写其他相对路径或留空。
 

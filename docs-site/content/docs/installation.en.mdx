@@ -5,13 +5,13 @@ description: "Installing the Super-SAG desktop app and bundled CLI."
 
 ## Windows desktop app
 
-The current version is `v0.1.0`; a [Windows installer is published](https://github.com/CalmBuilder/Super-SAG/releases/tag/v0.1.0). Complete business workflows and data-preserving upgrade still require acceptance. See the [development guide](/en/docs/development) for source-build preparation.
+The current version is `v0.1.0`; a [Windows installer is published](https://github.com/CalmBuilder/Super-SAG/releases/tag/v0.1.0). The user reports that Windows business workflows and a data-preserving upgrade passed on their machine; the tested package and source are listed in the [acceptance records](https://github.com/CalmBuilder/Super-SAG/tree/main/docs/web端设计). See the [development guide](/en/docs/development) for source-build preparation.
 
 The installer includes the local CLI. After the desktop app initializes it, open a new terminal and run `super-sag --version`. The CLI and desktop app share the local knowledge base, settings and service, with no login required.
 
-<Callout title="Upgrading existing data">In-place upgrades still require Windows acceptance with isolated test data. Back up first; selecting “delete application data” in an uninstaller affects settings, indexes and conversations.</Callout>
+<Callout title="Upgrading existing data">The user reports a successful data-preserving upgrade; verify other installation and data environments separately. Back up first; selecting “delete application data” in an uninstaller affects settings, indexes and conversations.</Callout>
 
-The `v0.1.0` installer allows an in-place upgrade only for the specifically identified test build. Unrecognized versions and MSI installations matching this product identity are stopped, leaving the existing installation in place. Silent same-version reinstalls are also stopped; an interactive reinstall requires an explicit choice. If the installed version cannot be verified, keep the installation and data in place and check the version and backups first. Legacy upgrades still require hands-on Windows validation.
+The `v0.1.0` installer allows an in-place upgrade only for the specifically identified test build. Unrecognized versions and MSI installations matching this product identity are stopped, leaving the existing installation in place. Silent same-version reinstalls are also stopped; an interactive reinstall requires an explicit choice. If the installed version cannot be verified, keep the installation and data in place and check the version and backups first.
 
 ## macOS desktop app
 

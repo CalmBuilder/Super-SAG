@@ -5,13 +5,13 @@ description: "Super-SAG 桌面版及随附 CLI 的安装说明。"
 
 ## Windows 桌面版
 
-当前版本为 `v0.1.0`，[Windows 安装包已发布](https://github.com/CalmBuilder/Super-SAG/releases/tag/v0.1.0)。完整业务功能和保留数据的升级仍待验收。源码构建的准备步骤见[开发指南](/zh/docs/development)。
+当前版本为 `v0.1.0`，[Windows 安装包已发布](https://github.com/CalmBuilder/Super-SAG/releases/tag/v0.1.0)。用户反馈 Windows 全部业务及保留数据升级已通过实机测试；实际验收包与源码见[验收记录](https://github.com/CalmBuilder/Super-SAG/tree/main/docs/web端设计)。源码构建的准备步骤见[开发指南](/zh/docs/development)。
 
 安装程序随附本地 CLI。完成桌面端的 CLI 初始化后，在新终端运行 `super-sag --version`。CLI 和桌面版共用本地知识库、配置和服务，无需登录。
 
-<Callout title="已有数据升级">覆盖升级仍待使用隔离测试数据在 Windows 实机验收。安装前请备份；卸载界面的“删除应用程序数据”会影响配置、索引和会话。</Callout>
+<Callout title="已有数据升级">用户已反馈保留数据升级通过；其他安装和数据环境应分别核对。安装前请备份；卸载界面的“删除应用程序数据”会影响配置、索引和会话。</Callout>
 
-当前 `v0.1.0` 安装器仅对已识别的测试构建提供原目录升级；未识别的其他版本和匹配本产品标识的 MSI 安装会停止，并保留现有安装。同版本的静默重装也会停止，交互安装需明确选择重装。若出现版本无法确认的提示，请保留现有安装及数据，先核对版本和备份；旧版兼容升级仍需实机验证。
+当前 `v0.1.0` 安装器仅对已识别的测试构建提供原目录升级；未识别的其他版本和匹配本产品标识的 MSI 安装会停止，并保留现有安装。同版本的静默重装也会停止，交互安装需明确选择重装。若出现版本无法确认的提示，请保留现有安装及数据，先核对版本和备份。
 
 ## macOS 桌面版
 

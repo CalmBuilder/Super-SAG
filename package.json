@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 1420 --strictPort",
     "build": "svelte-check --tsconfig ./tsconfig.json && vite build",
+    "build:web:ui": "svelte-check --tsconfig ./tsconfig.json && vite build --config vite.web.config.ts",
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "tauri": "tauri",
     "test": "vitest run",

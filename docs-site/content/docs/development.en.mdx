@@ -34,9 +34,13 @@ The frontend server does not provide Tauri's local file and retrieval interfaces
 
 From the repository root, run `npx vite --host 127.0.0.1 --port 1427 --strictPort`, then open `http://127.0.0.1:1427/tests/visual/` on the same machine. The preview reuses the desktop workspace, shows Super-SAG in the sidebar and About panel, and uses a collapsible sidebar on narrow screens. Open `/tests/visual/?fixture=conversation` to inspect a synthetic conversation and citation; open `/tests/visual/?fixture=search` and enter `示例流程` to inspect a preset search result; open `/tests/visual/?fixture=files` to inspect synthetic folders, the document editor and the location picker for a new document. Conversation search, message editing, streaming responses, tool states and approval dialogs in browser regression also use test data and events; they do not execute real tools. The preview is labeled as synthetic data for interface development. It does not connect to real folders, indexes or models and is not a deployable Web service. Unimplemented writes report an error.
 
-Desktop rebranding is in progress; Windows installation and in-place upgrade still require native acceptance. Do not expose the test preview as a service.
+The user reports that Windows business workflows and a data-preserving upgrade passed on their machine. Do not expose the test preview as a service.
 
 The preview changes some `sag.*` local-storage entries for the same browser origin; use a separate browser profile and a dedicated loopback port. On narrow screens, the sidebar folder menu can be obscured, and the drawer can remain open after navigation. This preview is preliminary work before Windows acceptance. Formal Web comparisons must use the accepted Super-SAG Windows installer as the baseline.
+
+### B/S interface development
+
+The new browser entry adapts the existing desktop components incrementally. Run `npm run build:web:ui` to build the interface code; there is no Web business service yet, so the entry explicitly reports that the service is unavailable. See `tests/bs/README.md` in the repository for isolated fixtures, browser checks and scope. This build is not a deployment package and cannot be used with a real knowledge base.
 
 ## Build the CLI
 

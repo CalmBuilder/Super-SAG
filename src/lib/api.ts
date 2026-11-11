@@ -1,2 +1,2 @@
-import { invoke } from '@tauri-apps/api/core';
-export const api=<T>(command:string,args?:Record<string,unknown>)=>invoke<T>(command,args);
+import {invokePlatform} from './platform';
+export const api=<T>(command:string,args?:Record<string,unknown>)=>invokePlatform<T>(command,args);

@@ -1577,5 +1577,7 @@
   "索引在本机建立，耗时取决于设备、文件数量、大小和格式。": "The index is built locally. Time depends on your device and the number, size and formats of your files.",
   "检索与原文": "Retrieval and sources",
   "深入检索说明": "Deep search details",
-  "深入检索结合本地索引和已配置的 Jev 服务，返回可核对的原文片段。": "Deep search combines the local index with your configured Jev service and returns passages you can verify."
+  "深入检索结合本地索引和已配置的 Jev 服务，返回可核对的原文片段。": "Deep search combines the local index with your configured Jev service and returns passages you can verify.",
+  "无法连接 Super-SAG Web 服务": "Cannot connect to the Super-SAG Web service",
+  "Web 服务尚未接通": "The Web service is not connected yet"
 }

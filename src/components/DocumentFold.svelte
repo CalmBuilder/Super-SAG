@@ -1,6 +1,7 @@
 <script lang="ts">
  import {onDestroy,tick} from 'svelte';
- import {listen,type UnlistenFn} from '@tauri-apps/api/event';
+ import type {UnlistenFn} from '@tauri-apps/api/event';
+ import {listen} from '../lib/platform';
  import {api} from '../lib/api';
  import {t,language} from '../lib/i18n';
  import {icon} from '../lib/icons';

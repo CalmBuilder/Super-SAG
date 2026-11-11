@@ -23,7 +23,7 @@
  import {defaultUpdateSettings} from '../lib/updates';
  import {providers,providerFor,sameProviderOrigin,type ModelKind} from '../lib/providers';
  export let onShowGuide:(()=>void)|undefined=undefined;
- export let surface:'desktop'|'web'='desktop';
+ export let surface:'desktop'|'web'|'browser'='desktop';
  export let onIndexHistory:(()=>void)|undefined=undefined;
  export let onBeforeUpdate:(()=>Promise<boolean>)|undefined=undefined;
  export let onSaved:(()=>void)|undefined=undefined;

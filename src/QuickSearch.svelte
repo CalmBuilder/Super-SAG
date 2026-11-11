@@ -1,6 +1,6 @@
 <script lang="ts">
  import {onMount,tick} from 'svelte';
- import {listen} from '@tauri-apps/api/event';
+ import {listen} from './lib/platform';
  import {api} from './lib/api';
  import {t,setLanguage} from './lib/i18n';
  import {applyTheme,watchSystemTheme} from './lib/theme';
