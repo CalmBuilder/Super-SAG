@@ -113,9 +113,11 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
         initial_width = css('.sidebar').rect['width']
         clickable('[aria-label="收起侧边栏"]').click()
         wait.until(lambda current: 'compact-sidebar' in current.find_element(By.CSS_SELECTOR, '.real-client').get_attribute('class').split())
+        wait.until(lambda current: current.find_element(By.CSS_SELECTOR, '.sidebar').rect['width'] < initial_width - 30)
         assert css('.sidebar').rect['width'] < initial_width
         clickable('[aria-label="展开侧边栏"]').click()
         wait.until(lambda current: 'compact-sidebar' not in current.find_element(By.CSS_SELECTOR, '.real-client').get_attribute('class').split())
+        wait.until(lambda current: abs(current.find_element(By.CSS_SELECTOR, '.sidebar').rect['width'] - initial_width) <= 1)
         assert abs(css('.sidebar').rect['width'] - initial_width) <= 1
         no_errors()
         record('desktop-sized sidebar collapse and expand')
