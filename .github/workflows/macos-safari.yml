@@ -1,0 +1,46 @@
+name: Super-SAG macOS Safari extension checks
+
+on:
+  push:
+    branches: [main, 'validation-safari/**']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  safari:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, macos-15-intel]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24.22.1'
+      - name: Test Safari file storage and default paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          swiftc browser-extension/safari/ClipFileStore.swift browser-extension/tests/ClipFileStoreTests.swift -o "$RUNNER_TEMP/super-sag-clipper-file-test"
+          "$RUNNER_TEMP/super-sag-clipper-file-test"
+          swiftc browser-extension/safari/ClipFileStore.swift browser-extension/tests/DefaultDirectoryTests.swift -o "$RUNNER_TEMP/super-sag-clipper-path-test"
+          "$RUNNER_TEMP/super-sag-clipper-path-test"
+      - name: Build the ad-hoc signed Safari development package
+        run: npm run build:clipper:safari
+      - name: Check generated Safari app and development DMG
+        shell: bash
+        run: |
+          set -euo pipefail
+          app='browser-extension/build/safari-development-derived/Build/Products/Release/Super-SAG Web Clipper.app'
+          test -d "$app/Contents/PlugIns/Super-SAG Web Clipper Extension.appex"
+          test -f browser-extension/build/sag-web-clipper-safari-development.dmg
+          codesign --verify --deep --strict "$app"
+          echo 'Development package and ad-hoc signature verified. Safari enablement and distribution are not covered.'
