@@ -1,5 +1,7 @@
 """Shared geometry probe for installed desktop and browser screenshots."""
 
+import re
+
 from playwright.sync_api import expect
 
 
@@ -17,6 +19,18 @@ def compare_layout(view, desktop, browser, tolerance=2):
             actual = browser[selector][key]
             if abs(actual - value) > tolerance:
                 raise AssertionError(f'{view} {selector} {key}: desktop={value}, browser={actual}')
+
+
+def exercise_sidebar_collapse(page):
+    initial_width = page.locator('.sidebar').bounding_box()['width']
+    page.get_by_role('button', name='收起侧边栏', exact=True).click()
+    expect(page.locator('.real-client')).to_have_class(re.compile(r'\bcompact-sidebar\b'))
+    compact_width = page.locator('.sidebar').bounding_box()['width']
+    assert compact_width < initial_width, (initial_width, compact_width)
+    page.get_by_role('button', name='展开侧边栏', exact=True).click()
+    expect(page.locator('.real-client')).not_to_have_class(re.compile(r'\bcompact-sidebar\b'))
+    restored_width = page.locator('.sidebar').bounding_box()['width']
+    assert abs(restored_width - initial_width) <= 1, (initial_width, restored_width)
 
 
 def preference_layouts(page, output, prefix):
