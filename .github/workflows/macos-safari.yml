@@ -54,3 +54,5 @@ jobs:
           assert 'Super-SAG 网页剪藏' in scripts[0].read_text(encoding='utf-8')
           PY
           echo 'Development package and ad-hoc signature verified. Safari enablement and distribution are not covered.'
+      - name: Verify the native Safari setup window
+        run: python3 scripts/probe-macos-gui.py

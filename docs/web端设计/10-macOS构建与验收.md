@@ -7,7 +7,7 @@ macOS 与 Windows 同属免登录、本地单用户的个人桌面版；核心�
 - 分别验证 Apple 芯片 `arm64` 和 Intel `x86_64`，记录 macOS 版本、设备或虚拟机类型、源码提交、构建工具版本、应用版本、DMG 摘要及测试数据；明确并验证最低支持系统版本，不能用单一系统版本推断全部版本可用。
 - 项目侧负责提供 macOS 验证环境，不要求用户执行 Mac 测试。GitHub 托管的原生 macOS 虚拟机可验证对应系统上的构建和进程，但不等同物理 Mac，也不能单凭启动证明窗口交互、业务或安装体验通过。
 - `npm run package:macos` 构建 `.app` 与 `.dmg` 并检查应用内容。`.github/workflows/macos-build.yml` 在两种芯片架构的原生 macOS 环境运行构建、资源检查、隔离启动与 CLI 集成检查；各项以运行结果为准。
-- `.github/workflows/macos-safari.yml` 在两种芯片架构上检查扩展文件保存边界及本地 Safari 开发包构建；不覆盖 Safari 实际启用、网页剪藏和正式分发。
+- `.github/workflows/macos-safari.yml` 在两种芯片架构上检查扩展文件保存边界、本地 Safari 开发包构建，以及开发引导窗口能否显示并通过系统辅助功能前置；不覆盖 Safari 实际启用、网页剪藏和正式分发。
 - 当前构建配置使用临时签名；签名完整性检查不等于 Apple Developer ID 签名、公证、Gatekeeper 和面向用户分发通过。若未提供经过校验的 Safari 扩展安装包，当前普通桌面构建会禁用 Safari 扩展导出；该扩展仍需完成发布包签名、公证与实际验证。
 
 ## 验收清单

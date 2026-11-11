@@ -23,6 +23,8 @@
 
 上述构建早于中文引导标题的品牌修正；修正后另行启动[运行 42959347462](https://github.com/CalmBuilder/Super-SAG/actions/runs/42959347462)，基于提交 `15193f946bbb1543a24f2e05f4696c3f72ee6845` 检查两种芯片及实际包中的标题。Apple 芯片和 Intel 的源码测试、开发包构建与包内中文标题检查均通过。开发测试包不是桌面应用内的已公证 Safari 扩展，尚未验证 Safari 实际启用和网页剪藏。
 
+[运行 42960644238](https://github.com/CalmBuilder/Super-SAG/actions/runs/42960644238) 基于临时验证提交 `9aab559017807eda65736c7d5fcbe538109899fb`，在两种芯片的 macOS 15 虚拟机分别启动 Safari 开发引导应用，均检测到一个屏幕上的原生窗口，并成功对该窗口执行系统辅助功能 `AXRaise`。该次探测脚本已保留为 `scripts/probe-macos-gui.py`，SHA-256 为 `86a4291a0a77f95f10b95746732a324583ae30173f145c4259d2234e985e9084`。此结果不覆盖主程序窗口或引导页面里的业务操作。
+
 ## 不在通过范围内
 
 Finder 安装交互、窗口及菜单操作、物理 Mac、真实模型问答和引用、真实 Agent 调用、旧数据升级、Developer ID 签名、公证、Gatekeeper、Safari 扩展安装和实际使用均未完成验收。临时签名和 CI 单次启动不能证明正式分发或整个 macOS 产品可用。
