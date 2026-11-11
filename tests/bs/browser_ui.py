@@ -182,6 +182,22 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
                 record('responsive sidebar boundary', width=width)
                 context.close()
 
+            context, page = new_page(width=960)
+            page.set_viewport_size({'width': 959, 'height': 800})
+            toggle = page.get_by_role('button', name='展开侧边栏')
+            expect(toggle).to_be_visible()
+            toggle.click()
+            expect(page.locator('main.workspace')).to_have_attribute('inert', '')
+            page.set_viewport_size({'width': 960, 'height': 800})
+            expect(page.locator('.browser-sidebar-toggle')).to_have_count(0)
+            expect(page.locator('.sidebar')).to_be_visible()
+            expect(page.locator('main.workspace')).not_to_have_attribute('inert', '')
+            page.set_viewport_size({'width': 959, 'height': 800})
+            expect(page.get_by_role('button', name='展开侧边栏')).to_have_attribute('aria-expanded', 'false')
+            expect(page.locator('.sidebar')).not_to_be_visible()
+            record('resize across sidebar boundary while open')
+            context.close()
+
             for width in (320, 375):
                 context, page = new_page(width=width)
                 page.get_by_role('button', name='展开侧边栏').click()

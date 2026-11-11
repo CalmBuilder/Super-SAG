@@ -181,6 +181,24 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
             no_errors()
             record('responsive sidebar boundary', width=width)
 
+        driver.set_window_rect(width=960, height=800)
+        visit()
+        driver.set_window_rect(width=959, height=800)
+        assert driver.execute_script('return window.innerWidth') == 959
+        css('[aria-label="展开侧边栏"].browser-sidebar-toggle').click()
+        wait.until(lambda current: current.execute_script('return document.querySelector("main.workspace").inert') is True)
+        driver.set_window_rect(width=960, height=800)
+        assert driver.execute_script('return window.innerWidth') == 960
+        wait.until(lambda current: not current.find_elements(By.CSS_SELECTOR, '.browser-sidebar-toggle'))
+        assert css('.sidebar').is_displayed()
+        assert driver.execute_script('return document.querySelector("main.workspace").inert') is False
+        driver.set_window_rect(width=959, height=800)
+        assert driver.execute_script('return window.innerWidth') == 959
+        wait.until(lambda current: css('[aria-label="展开侧边栏"].browser-sidebar-toggle').get_attribute('aria-expanded') == 'false')
+        wait.until(EC.invisibility_of_element_located((By.CSS_SELECTOR, '.sidebar')))
+        no_errors()
+        record('resize across sidebar boundary while open')
+
         for width in (320, 375):
             driver.set_window_rect(width=width, height=800)
             visit()
