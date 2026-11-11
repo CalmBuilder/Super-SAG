@@ -26,6 +26,13 @@ jobs:
         env:
           SMOKE_DIRECTORY: ${{ steps.install.outputs.directory }}
         run: ./tests/bs/native_ui_windows.ps1 -InstallDirectory "$env:SMOKE_DIRECTORY/installation"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: windows-accepted-baseline
+          path: ${{ runner.temp }}/bs-native-ui-evidence/
+          if-no-files-found: warn
+          retention-days: 7
   macos:
     runs-on: macos-15
     timeout-minutes: 15
