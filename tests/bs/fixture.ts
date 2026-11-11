@@ -50,6 +50,7 @@ const platform: AppPlatform = {
     switch (command) {
       case 'get_settings': result = settings; break;
       case 'save_settings':
+        if (scenario === 'theme-error') throw new Error('测试保存主题失败');
         settings = structuredClone(args?.settings as Settings);
         emit('settings-changed', null);
         result = null;
