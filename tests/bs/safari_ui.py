@@ -20,6 +20,7 @@ from urllib.request import urlopen
 from selenium import webdriver
 from selenium.webdriver import ActionChains
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
@@ -94,6 +95,13 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
         no_errors()
         record('desktop-sized navigation and shared workspace', width=1280)
 
+        ActionChains(driver).key_down(Keys.COMMAND).send_keys('k').key_up(Keys.COMMAND).perform()
+        wait.until(EC.text_to_be_present_in_element((By.CSS_SELECTOR, '.search-page h1'), '搜索你的文件'))
+        nav('问答')
+        wait.until(EC.text_to_be_present_in_element((By.CSS_SELECTOR, '.welcome h1'), '向你的文件提问'))
+        no_errors()
+        record('page keyboard shortcut opens search')
+
         css('[aria-label="设置"]').click()
         wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, '[role="dialog"]')))
         css('[aria-label="关闭设置"]').click()
@@ -102,6 +110,13 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
         wait.until(lambda current: current.execute_script('return document.documentElement.dataset.theme') == 'dark')
         no_errors()
         record('settings open/close and theme change')
+
+        visit(scenario='theme-error')
+        css('[aria-label="切换明暗主题"]').click()
+        wait.until(EC.text_to_be_present_in_element((By.CSS_SELECTOR, '#notice'), '测试保存主题失败'))
+        assert driver.execute_script('return document.documentElement.dataset.theme') == 'light'
+        no_errors()
+        record('theme save failure retains prior theme')
 
         visit(lang='en', theme='dark')
         wait.until(lambda current: current.execute_script('return document.documentElement.lang') == 'en')
@@ -121,6 +136,51 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
         assert driver.execute_script('const e=document.querySelector(".tree");return e.scrollHeight>e.clientHeight')
         no_errors()
         record('120 long folder names with scrolling')
+
+        visit(scenario='tree')
+        css('[aria-label="展开示例知识库"]').click()
+        css('[aria-label="展开一级"]').click()
+        wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, '[aria-label="展开二级"]')))
+        css('[aria-label="折叠一级"]').click()
+        css('[aria-label="折叠示例知识库"]').click()
+        wait.until(lambda current: len(current.find_elements(By.CSS_SELECTOR, '.tree-row')) == 1)
+        no_errors()
+        record('nested folder expansion and collapse')
+
+        visit(scenario='tree-error')
+        css('[aria-label="展开示例知识库"]').click()
+        wait.until(EC.text_to_be_present_in_element((By.CSS_SELECTOR, '#notice'), '测试读取目录失败'))
+        assert css('[aria-label="展开示例知识库"]').get_attribute('aria-expanded') == 'false'
+        no_errors()
+        record('folder expansion failure preserves collapsed state')
+
+        driver.get(origin + '/web/index.html')
+        wait.until(EC.text_to_be_present_in_element((By.CSS_SELECTOR, '.startup-error'), 'Web 服务尚未接通'))
+        driver.execute_script('''
+          localStorage.setItem('sag.sidebar.expanded', '{old invalid value');
+          localStorage.setItem('sag.search.history', '["old"]');
+          localStorage.setItem('sag.onboarding.seen', 'legacy');
+          localStorage.setItem('unrelated', 'keep');
+          localStorage.setItem('super-sag.web.v1.other', 'keep');
+        ''')
+        visit(scenario='tree')
+        css('[aria-label="展开示例知识库"]').click()
+        wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, '[aria-label="展开一级"]')))
+        assert driver.execute_script("return localStorage.getItem('sag.sidebar.expanded')") == '{old invalid value'
+        assert driver.execute_script("return localStorage.getItem('super-sag.web.v1.sag.sidebar.expanded')") is not None
+        css('[aria-label="设置"]').click()
+        wait.until(EC.element_to_be_clickable((By.XPATH, "//button[normalize-space()='数据与隐私']"))).click()
+        wait.until(EC.element_to_be_clickable((By.XPATH, "//button[normalize-space()='清除所有数据']"))).click()
+        css('[aria-label="确认清除所有数据"]').click()
+        wait.until(EC.invisibility_of_element_located((By.CSS_SELECTOR, '[role="dialog"]')))
+        assert driver.execute_script("return localStorage.getItem('sag.sidebar.expanded')") == '{old invalid value'
+        assert driver.execute_script("return localStorage.getItem('sag.search.history')") == '["old"]'
+        assert driver.execute_script("return localStorage.getItem('sag.onboarding.seen')") == 'legacy'
+        assert driver.execute_script("return localStorage.getItem('unrelated')") == 'keep'
+        assert driver.execute_script("return localStorage.getItem('super-sag.web.v1.other')") == 'keep'
+        assert driver.execute_script("return localStorage.getItem('super-sag.web.v1.sag.sidebar.expanded')") is None
+        no_errors()
+        record('old same-origin storage is ignored and preserved after simulated clear')
 
         for width in (320, 375, 768, 959, 960):
             driver.set_window_rect(width=width, height=800)
@@ -148,6 +208,24 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
                 assert css('.sidebar').is_displayed()
             no_errors()
             record('responsive sidebar boundary', width=width)
+
+        driver.set_window_rect(width=960, height=800)
+        visit()
+        driver.set_window_rect(width=959, height=800)
+        assert driver.execute_script('return window.innerWidth') == 959
+        css('[aria-label="展开侧边栏"].browser-sidebar-toggle').click()
+        wait.until(lambda current: current.execute_script('return document.querySelector("main.workspace").inert') is True)
+        driver.set_window_rect(width=960, height=800)
+        assert driver.execute_script('return window.innerWidth') == 960
+        wait.until(lambda current: not current.find_elements(By.CSS_SELECTOR, '.browser-sidebar-toggle'))
+        assert css('.sidebar').is_displayed()
+        assert driver.execute_script('return document.querySelector("main.workspace").inert') is False
+        driver.set_window_rect(width=959, height=800)
+        assert driver.execute_script('return window.innerWidth') == 959
+        wait.until(lambda current: css('[aria-label="展开侧边栏"].browser-sidebar-toggle').get_attribute('aria-expanded') == 'false')
+        wait.until(EC.invisibility_of_element_located((By.CSS_SELECTOR, '.sidebar')))
+        no_errors()
+        record('resize across sidebar boundary while open')
 
         for width in (320, 375):
             driver.set_window_rect(width=width, height=800)

@@ -80,6 +80,8 @@ jobs:
           python -m pip install -r tests/browser/requirements.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           & ./tests/bs/native_ui_windows.ps1 -InstallDirectory "$env:SMOKE_DIRECTORY/installation"
+          python tests/bs/windows_visual_compare.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:

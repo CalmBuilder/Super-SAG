@@ -91,6 +91,12 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
             page.screenshot(path=str(output / f'{args.browser}-workspace.png'))
             record('desktop-sized navigation and shared workspace', width=1280)
 
+            page.keyboard.press('Control+k')
+            expect(page.locator('.search-page h1')).to_have_text('搜索你的文件')
+            page.get_by_role('button', name='问答', exact=True).click()
+            expect(page.locator('.welcome h1')).to_have_text('向你的文件提问')
+            record('page keyboard shortcut opens search')
+
             page.get_by_role('button', name='设置', exact=True).click()
             expect(page.get_by_role('dialog')).to_be_visible()
             page.get_by_role('button', name='关闭设置').click()
@@ -98,6 +104,13 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
             page.get_by_role('button', name='切换明暗主题').click()
             expect(page.locator('html')).to_have_attribute('data-theme', 'dark')
             record('settings open/close and theme change')
+            context.close()
+
+            context, page = new_page(scenario='theme-error')
+            page.get_by_role('button', name='切换明暗主题').click()
+            expect(page.locator('#notice')).to_contain_text('测试保存主题失败')
+            expect(page.locator('html')).to_have_attribute('data-theme', 'light')
+            record('theme save failure retains prior theme')
             context.close()
 
             context, page = new_page(lang='en', theme='dark')
@@ -119,6 +132,57 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
             assert page.locator('.tree').evaluate('(el) => el.scrollHeight > el.clientHeight')
             expect(page.locator('.tree-row').last).to_contain_text('119-')
             record('120 long folder names with scrolling')
+            context.close()
+
+            context, page = new_page(scenario='tree')
+            root = page.get_by_role('button', name='展开示例知识库')
+            root.click()
+            expect(page.get_by_role('button', name='展开一级')).to_be_visible()
+            page.get_by_role('button', name='展开一级').click()
+            expect(page.get_by_role('button', name='展开二级')).to_be_visible()
+            page.get_by_role('button', name='折叠一级').click()
+            page.get_by_role('button', name='折叠示例知识库').click()
+            expect(page.locator('.tree-row')).to_have_count(1)
+            record('nested folder expansion and collapse')
+            context.close()
+
+            context, page = new_page(scenario='tree-error')
+            root = page.get_by_role('button', name='展开示例知识库')
+            root.click()
+            expect(page.locator('#notice')).to_contain_text('测试读取目录失败')
+            expect(root).to_have_attribute('aria-expanded', 'false')
+            record('folder expansion failure preserves collapsed state')
+            context.close()
+
+            context = browser.new_context(viewport={'width': 1280, 'height': 800}, locale='zh-CN')
+            page = context.new_page()
+            page.on('pageerror', lambda error: errors.append(str(error)))
+            page.goto(origin + '/web/index.html', wait_until='networkidle')
+            page.evaluate('''() => {
+              localStorage.setItem('sag.sidebar.expanded', '{old invalid value');
+              localStorage.setItem('sag.search.history', '["old"]');
+              localStorage.setItem('sag.onboarding.seen', 'legacy');
+              localStorage.setItem('unrelated', 'keep');
+              localStorage.setItem('super-sag.web.v1.other', 'keep');
+            }''')
+            page.goto(origin + '/tests/bs/index.html?scenario=tree', wait_until='networkidle')
+            expect(page.locator('.brand')).to_have_text('Super-SAG')
+            page.get_by_role('button', name='展开示例知识库').click()
+            expect(page.get_by_role('button', name='展开一级')).to_be_visible()
+            assert page.evaluate("localStorage.getItem('sag.sidebar.expanded')") == '{old invalid value'
+            assert page.evaluate("localStorage.getItem('super-sag.web.v1.sag.sidebar.expanded')") is not None
+            page.get_by_role('button', name='设置', exact=True).click()
+            page.get_by_role('button', name='数据与隐私', exact=True).click()
+            page.get_by_role('button', name='清除所有数据', exact=True).click()
+            page.get_by_role('button', name='确认清除所有数据').click()
+            expect(page.get_by_role('dialog')).to_have_count(0)
+            assert page.evaluate("localStorage.getItem('sag.sidebar.expanded')") == '{old invalid value'
+            assert page.evaluate("localStorage.getItem('sag.search.history')") == '["old"]'
+            assert page.evaluate("localStorage.getItem('sag.onboarding.seen')") == 'legacy'
+            assert page.evaluate("localStorage.getItem('unrelated')") == 'keep'
+            assert page.evaluate("localStorage.getItem('super-sag.web.v1.other')") == 'keep'
+            assert page.evaluate("localStorage.getItem('super-sag.web.v1.sag.sidebar.expanded')") is None
+            record('old same-origin storage is ignored and preserved after simulated clear')
             context.close()
 
             for width in (320, 375, 768, 959, 960):
@@ -148,6 +212,22 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
                     expect(page.locator('.sidebar')).to_be_visible()
                 record('responsive sidebar boundary', width=width)
                 context.close()
+
+            context, page = new_page(width=960)
+            page.set_viewport_size({'width': 959, 'height': 800})
+            toggle = page.get_by_role('button', name='展开侧边栏')
+            expect(toggle).to_be_visible()
+            toggle.click()
+            expect(page.locator('main.workspace')).to_have_attribute('inert', '')
+            page.set_viewport_size({'width': 960, 'height': 800})
+            expect(page.locator('.browser-sidebar-toggle')).to_have_count(0)
+            expect(page.locator('.sidebar')).to_be_visible()
+            expect(page.locator('main.workspace')).not_to_have_attribute('inert', '')
+            page.set_viewport_size({'width': 959, 'height': 800})
+            expect(page.get_by_role('button', name='展开侧边栏')).to_have_attribute('aria-expanded', 'false')
+            expect(page.locator('.sidebar')).not_to_be_visible()
+            record('resize across sidebar boundary while open')
+            context.close()
 
             for width in (320, 375):
                 context, page = new_page(width=width)

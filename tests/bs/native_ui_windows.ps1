@@ -45,6 +45,18 @@ try {
     if ($process.HasExited) { throw "Desktop exited: $($process.ExitCode)" }
   } while ($process.MainWindowHandle -eq 0 -and [DateTime]::UtcNow -lt $deadline)
   if ($process.MainWindowHandle -eq 0) { throw 'No desktop window handle.' }
+  $endpoint = Join-Path $data 'sag-service.json'
+  while (-not (Test-Path -LiteralPath $endpoint)) {
+    $process.Refresh()
+    if ($process.HasExited -or [DateTime]::UtcNow -gt $deadline) {
+      throw 'The installed app did not start its isolated service.'
+    }
+    Start-Sleep -Milliseconds 250
+  }
+  $service = & $cli service status | ConvertFrom-Json
+  if ($LASTEXITCODE -ne 0 -or $service.data_directory -ne $data) {
+    throw 'The installed app connected to an unexpected data directory.'
+  }
   python tests/bs/native_ui_windows.py
   if ($LASTEXITCODE -ne 0) { throw 'Native WebView interaction failed.' }
 } finally {

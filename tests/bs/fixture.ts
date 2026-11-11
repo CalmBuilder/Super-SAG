@@ -1,16 +1,18 @@
 /** Isolated visual fixtures; this module is never imported by the product entry. */
 import type {EventCallback, EventName, Options, UnlistenFn} from '@tauri-apps/api/event';
 import {mountBrowser} from '../../src/bs/mount';
+import {BROWSER_STORAGE_NAMESPACE} from '../../src/bs/platform';
 import type {AppPlatform} from '../../src/lib/platform';
 import type {Root, Settings} from '../../src/lib/types';
 
 const params = new URLSearchParams(location.search);
 const scenario = params.get('scenario') ?? 'normal';
+const desktopBaseline = scenario === 'desktop-baseline';
 const lang = params.get('lang') === 'en' ? 'en' : 'zh-CN';
 let settings: Settings = {
   language: lang, theme: params.get('theme') === 'dark' ? 'dark' : 'light', start_page: 'ask',
   editor_size: 15, show_hidden: false, watch: true, index_workers: 8, excluded: ['.git'],
-  answer: {url: '', model: '', models: [], has_key: false},
+  answer: {url: '', model: desktopBaseline ? 'qwen3.6-flash' : '', models: desktopBaseline ? ['qwen3.6-flash'] : [], has_key: false},
   jev: {url: '', model: '', models: [], has_key: false},
   retrieval: {candidate_k: 50, seed_k: 10, expansion_term_limit: 20, max_hops: 1, top_k: 10, chunk_chars: 512},
   timeout_secs: 120, answer_context_tokens: 65536, answer_output_tokens: 2048,
@@ -22,7 +24,9 @@ const roots: Root[] = scenario === 'empty' ? [] : scenario === 'many'
       path: `/test/folder-${index}`, name: `${index}-${'示例文件夹'.repeat(18)}`,
       status: 'ready', count: index, error: null,
     }))
-  : [{path: '/test/library', name: '示例知识库', status: 'ready', count: 1, error: null}];
+  : desktopBaseline
+    ? [{path: '/test/super-sag', name: 'Super-SAG', status: 'ready', count: 0, error: null}]
+    : [{path: '/test/library', name: '示例知识库', status: 'ready', count: 1, error: null}];
 const calls: string[] = [];
 const pageErrors: string[] = [];
 window.addEventListener('error', event => pageErrors.push(event.message));
@@ -47,19 +51,30 @@ const platform: AppPlatform = {
     switch (command) {
       case 'get_settings': result = settings; break;
       case 'save_settings':
+        if (scenario === 'theme-error') throw new Error('测试保存主题失败');
         settings = structuredClone(args?.settings as Settings);
         emit('settings-changed', null);
         result = null;
         break;
       case 'list_roots': result = roots; break;
-      case 'list_files': result = scenario === 'empty' ? [] : [{id: 1, path: '/test/library/example.md', name: 'example.md'}]; break;
-      case 'list_entries': result = []; break;
+      case 'list_files': result = scenario === 'empty' || desktopBaseline ? [] : [{id: 1, path: '/test/library/example.md', name: 'example.md'}]; break;
+      case 'list_entries': {
+        if (scenario === 'tree-error') throw new Error('测试读取目录失败');
+        const path = args?.path;
+        result = scenario !== 'tree' ? [] : path === '/test/library'
+          ? [{path: '/test/library/一级', name: '一级', directory: true, symlink: false}]
+          : path === '/test/library/一级'
+            ? [{path: '/test/library/一级/二级', name: '二级', directory: true, symlink: false}]
+            : [];
+        break;
+      }
       case 'get_index_status': result = {paused: false, tasks: []}; break;
       case 'list_removed_directories':
       case 'get_index_history':
       case 'list_conversations':
       case 'list_notes':
       case 'list_drafts': result = []; break;
+      case 'clear_all_data': result = null; break;
       case 'get_docling_status': result = {installed: false, running: false, stage: '', message: '', downloaded: 0, total: null, error: null, formats: []}; break;
       default: throw new Error(`测试替身未实现：${command}`);
     }
@@ -68,7 +83,7 @@ const platform: AppPlatform = {
 };
 
 // Test server uses an isolated origin and browser profile; this does not touch desktop data.
-localStorage.setItem('sag.onboarding.seen', '1');
+localStorage.setItem(`${BROWSER_STORAGE_NAMESPACE}sag.onboarding.seen`, '1');
 Object.assign(window, {__BS_TEST__: {calls, scenario, pageErrors}});
 const target = document.getElementById('app');
 if (!target) throw new Error('Missing visual test container');
