@@ -91,6 +91,12 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
             page.screenshot(path=str(output / f'{args.browser}-workspace.png'))
             record('desktop-sized navigation and shared workspace', width=1280)
 
+            page.keyboard.press('Control+k')
+            expect(page.locator('.search-page h1')).to_have_text('搜索你的文件')
+            page.get_by_role('button', name='问答', exact=True).click()
+            expect(page.locator('.welcome h1')).to_have_text('向你的文件提问')
+            record('page keyboard shortcut opens search')
+
             page.get_by_role('button', name='设置', exact=True).click()
             expect(page.get_by_role('dialog')).to_be_visible()
             page.get_by_role('button', name='关闭设置').click()

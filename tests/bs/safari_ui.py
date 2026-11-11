@@ -20,6 +20,7 @@ from urllib.request import urlopen
 from selenium import webdriver
 from selenium.webdriver import ActionChains
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
@@ -93,6 +94,13 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
         driver.save_screenshot(str(output / 'safari-workspace.png'))
         no_errors()
         record('desktop-sized navigation and shared workspace', width=1280)
+
+        ActionChains(driver).key_down(Keys.COMMAND).send_keys('k').key_up(Keys.COMMAND).perform()
+        wait.until(EC.text_to_be_present_in_element((By.CSS_SELECTOR, '.search-page h1'), '搜索你的文件'))
+        nav('问答')
+        wait.until(EC.text_to_be_present_in_element((By.CSS_SELECTOR, '.welcome h1'), '向你的文件提问'))
+        no_errors()
+        record('page keyboard shortcut opens search')
 
         css('[aria-label="设置"]').click()
         wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, '[role="dialog"]')))
