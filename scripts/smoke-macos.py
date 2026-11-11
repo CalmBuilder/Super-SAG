@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Smoke-test a built macOS DMG on a disposable GitHub-hosted runner.
 
-This checks native process startup and its isolated service, not window
-interaction, distribution signing, notarization, or a user's machine.
+This checks native process startup, its isolated service, and whether its
+window can be raised; it does not validate business interactions, distribution
+signing, notarization, or a user's machine.
 """
 import argparse
 import hashlib
@@ -18,6 +19,17 @@ import time
 
 
 ROOT = Path(__file__).resolve().parents[1]
+WINDOW_PROBE = r'''
+import Foundation
+import CoreGraphics
+let target = Int32(CommandLine.arguments[1])!
+let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
+let owned = windows.filter { window in
+    (window[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value == target &&
+    (window[kCGWindowLayer as String] as? NSNumber)?.intValue == 0
+}
+print(owned.count)
+'''
 
 
 def run(*args, **kwargs):
@@ -27,6 +39,29 @@ def run(*args, **kwargs):
 def require(condition, message):
     if not condition:
         raise RuntimeError(message)
+
+
+def verify_native_window(process, temporary):
+    swift_source = temporary / 'windows.swift'
+    swift_source.write_text(WINDOW_PROBE)
+    window_probe = temporary / 'windows'
+    run('swiftc', str(swift_source), '-o', str(window_probe), timeout=90)
+    deadline = time.monotonic() + 45
+    last_error = 'no on-screen window'
+    while time.monotonic() < deadline and process.poll() is None:
+        result = run(str(window_probe), str(process.pid), timeout=15)
+        value = result.stdout.strip()
+        if value.isdigit() and int(value) > 0:
+            statement = f'tell application "System Events" to tell (first application process whose unix id is {process.pid}) to perform action "AXRaise" of window 1'
+            try:
+                run('osascript', '-e', statement, timeout=15)
+                return {'on_screen_windows': int(value), 'accessibility_raise': True}
+            except subprocess.CalledProcessError as error:
+                last_error = (error.stderr or str(error))[-500:]
+            except subprocess.TimeoutExpired:
+                last_error = 'System Events timed out'
+        time.sleep(1)
+    raise RuntimeError(f'The desktop window was not visible and accessible: {last_error}')
 
 
 def main():
@@ -82,6 +117,12 @@ def main():
                 architectures = run("lipo", "-archs", str(binary)).stdout.split()
                 require(args.arch in architectures, f"{binary.name} lacks {args.arch}")
             run("codesign", "--verify", "--deep", "--strict", str(installed))
+            try:
+                policy = subprocess.run(["spctl", "--assess", "--type", "execute", "--verbose=2", str(installed)],
+                                        text=True, capture_output=True, timeout=30)
+                assessment = {"exit_code": policy.returncode, "result": (policy.stderr or policy.stdout).strip()[-500:]}
+            except subprocess.TimeoutExpired:
+                assessment = {"result": "spctl assessment timed out"}
             cli_version = run(str(cli), "--version", env=environment).stdout.strip()
             require(cli_version == f"sag {version}", f"Unexpected bundled CLI version: {cli_version}")
             identity = json.loads(run(str(cli), "--build-info", env=environment).stdout)
@@ -104,12 +145,15 @@ def main():
                 service = json.loads(run(str(cli), "service", "status", env=environment).stdout)
                 require(service["version"] == version and Path(service["data_directory"]).resolve() == data,
                         "Desktop connected to an unexpected service or data directory")
+                window = verify_native_window(process, temporary)
 
             print(json.dumps({"status": "passed", "runner": platform.platform(), "architecture": args.arch,
                               "version": version, "dmg_sha256": digest, "installed_from_dmg": True,
                               "signature": "local ad-hoc signature integrity only",
-                              "scope": "DMG copy, native app process and isolated service startup",
-                              "not_verified": ["window interaction", "real model", "physical Mac", "Developer ID", "notarization"]}, indent=2))
+                              "spctl_assessment": assessment,
+                              "native_window": window,
+                              "scope": "DMG copy, native app process, isolated service and native window raise",
+                              "not_verified": ["window business interactions", "real model", "physical Mac", "Developer ID", "notarization"]}, indent=2))
         finally:
             if process is not None and process.poll() is None:
                 process.terminate()
