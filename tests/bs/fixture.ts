@@ -56,7 +56,16 @@ const platform: AppPlatform = {
         break;
       case 'list_roots': result = roots; break;
       case 'list_files': result = scenario === 'empty' || desktopBaseline ? [] : [{id: 1, path: '/test/library/example.md', name: 'example.md'}]; break;
-      case 'list_entries': result = []; break;
+      case 'list_entries': {
+        if (scenario === 'tree-error') throw new Error('测试读取目录失败');
+        const path = args?.path;
+        result = scenario !== 'tree' ? [] : path === '/test/library'
+          ? [{path: '/test/library/一级', name: '一级', directory: true, symlink: false}]
+          : path === '/test/library/一级'
+            ? [{path: '/test/library/一级/二级', name: '二级', directory: true, symlink: false}]
+            : [];
+        break;
+      }
       case 'get_index_status': result = {paused: false, tasks: []}; break;
       case 'list_removed_directories':
       case 'get_index_history':

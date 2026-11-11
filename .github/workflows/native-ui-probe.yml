@@ -21,7 +21,12 @@ jobs:
         run: python -m pip install -r tests/browser/requirements.txt
       - name: Download the verified release installer
         shell: pwsh
-        run: gh release download v0.1.0 --repo CalmBuilder/Super-SAG --pattern 'Super-SAG_0.1.0_x64-setup.exe' --dir "$env:RUNNER_TEMP"
+        run: |
+          gh release download v0.1.0 --repo CalmBuilder/Super-SAG --pattern 'Super-SAG_0.1.0_x64-setup.exe' --dir "$env:RUNNER_TEMP"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $digest = (Get-FileHash -Algorithm SHA256 -LiteralPath "$env:RUNNER_TEMP/Super-SAG_0.1.0_x64-setup.exe").Hash
+          if ($digest -ne 'F6B96076EA23BFC9C537C3D3B2B245A5D296EABDFC243FF588ED816BB2A7A644') { throw 'The downloaded installer does not match the accepted Windows baseline.' }
+          Write-Output "Accepted installer SHA-256: $digest"
       - name: Install in isolation
         id: install
         shell: pwsh
