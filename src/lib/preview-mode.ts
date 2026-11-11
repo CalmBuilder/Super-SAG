@@ -1,5 +1,6 @@
-// Set localStorage 'sag.preview.legacy' to '1' to return to whole-document
-// rendering for previews while the progressive reader is new.
+// Desktop keeps 'sag.preview.legacy'; browser preferences use their own namespace.
+import {appStorage} from './storage';
+
 export function legacyPreview(){
- try{return localStorage.getItem('sag.preview.legacy')==='1'}catch{return false}
+ try{return appStorage.getItem('sag.preview.legacy')==='1'}catch{return false}
 }

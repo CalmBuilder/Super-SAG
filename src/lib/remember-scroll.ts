@@ -1,7 +1,9 @@
+import {appStorage} from './storage';
+
 export function rememberScroll(node:HTMLElement,options:{key:string;enabled:boolean}){
- let position=Number(localStorage.getItem(options.key)??0);
+ let position=Number(appStorage.getItem(options.key)??0);
  const restore=()=>{if(options.enabled)node.scrollTop=position};
- const save=()=>{if(options.enabled){position=node.scrollTop;localStorage.setItem(options.key,String(position))}};
+ const save=()=>{if(options.enabled){position=node.scrollTop;appStorage.setItem(options.key,String(position))}};
  node.addEventListener('scroll',save);
  restore();
  return{
