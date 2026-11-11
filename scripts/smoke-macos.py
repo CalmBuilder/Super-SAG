@@ -56,8 +56,9 @@ def verify_native_window(process, temporary):
             try:
                 run('osascript', '-e', statement, timeout=15)
                 probe = subprocess.run([str(Path(os.environ['RUNNER_TEMP']) / 'native-ax-probe'), str(process.pid)],
-                                       text=True, capture_output=True, timeout=30)
+                                       text=True, capture_output=True, timeout=90)
                 print('ACCESSIBILITY_PROBE', probe.returncode, probe.stdout[-16000:], probe.stderr[-1000:])
+                require(probe.returncode == 0, 'Native accessibility interactions failed')
                 return {'on_screen_windows': int(value), 'accessibility_raise': True}
             except subprocess.CalledProcessError as error:
                 last_error = (error.stderr or str(error))[-500:]

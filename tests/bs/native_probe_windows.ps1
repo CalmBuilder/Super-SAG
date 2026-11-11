@@ -10,7 +10,12 @@ New-Item -ItemType Directory -Path $data -Force | Out-Null
 $env:SAG_DATA_DIR=$data
 $env:SAG_DESKTOP_DATA_DIR=$data
 $env:WEBVIEW2_USER_DATA_FOLDER=Join-Path $probeDirectory 'webview'
-$env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS='--force-renderer-accessibility'
+$listener=[System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+$listener.Start()
+$port=([System.Net.IPEndPoint]$listener.LocalEndpoint).Port
+$listener.Stop()
+$env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS="--remote-debugging-port=$port --remote-debugging-address=127.0.0.1"
+$env:BS_NATIVE_DEBUG_PORT=$port
 $desktop=Join-Path $InstallDirectory 'sag-desktop.exe'
 $cli=Join-Path $InstallDirectory 'bin\sag.exe'
 $process=$null
@@ -33,6 +38,8 @@ try {
     if ($items.Count -ge 120) { break }
   }
   @{window_handle=$process.MainWindowHandle.ToInt64();node_count=$nodes.Count;items=$items} | ConvertTo-Json -Depth 6
+  python tests/bs/native_probe_windows.py
+  if ($LASTEXITCODE -ne 0) { throw 'Native WebView interaction failed' }
 } finally {
   if ($process) { $process.Refresh(); if (-not $process.HasExited) { Stop-Process -Id $process.Id -Force } }
   if (Test-Path -LiteralPath (Join-Path $data 'sag-service.json')) { & $cli service stop | Out-Null }
