@@ -218,10 +218,22 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
                     expect(page.locator('.sidebar')).to_be_visible()
                     expect(page.locator('main.workspace')).to_have_attribute('inert', '')
                     expect(page.locator('.sidebar-titlebar [aria-label="收起侧边栏"]')).to_be_focused()
+                    expect(page.locator('dialog.navigation-sheet')).to_have_attribute('open', '')
+                    if width == 320:
+                        page.keyboard.press('Tab')
+                        assert page.evaluate("!!document.activeElement.closest('dialog.navigation-sheet')")
+                        record('drawer keyboard focus remains inside the modal')
                     page.keyboard.press('Escape')
                     expect(page.locator('.sidebar')).not_to_be_visible()
                     expect(toggle).to_have_attribute('aria-expanded', 'false')
                     expect(toggle).to_be_focused()
+                    if width == 320:
+                        toggle.click()
+                        expect(page.locator('dialog.navigation-sheet')).to_have_attribute('open', '')
+                        page.mouse.click(width - 5, 400)
+                        expect(page.locator('.sidebar')).not_to_be_visible()
+                        expect(toggle).to_be_focused()
+                        record('drawer backdrop closes and restores focus')
                     toggle.click()
                     page.get_by_role('button', name='设置', exact=True).click()
                     expect(page.get_by_role('dialog')).to_be_visible()
@@ -258,6 +270,13 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
                 menu_item = page.get_by_role('menuitem', name='搜索', exact=True)
                 expect(menu_item).to_be_visible()
                 assert menu_item.evaluate('(el) => {const r=el.getBoundingClientRect();return el.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2));}')
+                if width == 320:
+                    page.keyboard.press('Escape')
+                    expect(page.get_by_role('menu')).to_have_count(0)
+                    expect(page.locator('dialog.navigation-sheet')).to_have_attribute('open', '')
+                    page.get_by_role('button', name='示例知识库 的文件夹选项').click()
+                    expect(menu_item).to_be_visible()
+                    record('escaping a folder menu leaves the drawer open')
                 menu_item.click()
                 expect(page.locator('.search-page h1')).to_have_text('搜索你的文件')
                 expect(page.locator('.sidebar')).not_to_be_visible()
@@ -276,12 +295,16 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
             context = browser.new_context(viewport={'width': 1280, 'height': 800})
             page = context.new_page()
             page.on('pageerror', lambda error: errors.append(str(error)))
-            page.add_init_script("localStorage.setItem('sag.sidebar.expanded', '{old invalid value'); localStorage.setItem('sag.search.history', '{old invalid value');")
+            page.add_init_script("""localStorage.setItem('sag.sidebar.expanded', '{old invalid value');
+              localStorage.setItem('sag.search.history', '{old invalid value');
+              localStorage.setItem('super-sag.web.v1.sag.sidebar.expanded', '{bad');
+              localStorage.setItem('super-sag.web.v1.sag.search.history', '{}');""")
             page.goto(origin + '/web/index.html', wait_until='networkidle')
             expect(page.locator('.startup-error')).to_contain_text('Web 服务尚未接通')
             assert page.evaluate("typeof window.__BS_TEST__") == 'undefined'
             assert page.evaluate("typeof window.__TAURI_INTERNALS__") == 'undefined'
             assert page.evaluate("localStorage.getItem('sag.sidebar.expanded')") == '{old invalid value'
+            assert page.evaluate("localStorage.getItem('super-sag.web.v1.sag.sidebar.expanded')") == '{bad'
             record('product entry rejects unavailable business without a fixture')
             context.close()
 
@@ -291,7 +314,7 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
 
         source_names = [
             'src/App.svelte', 'src/lib/platform.ts', 'src/lib/storage.ts', 'src/lib/remember-scroll.ts',
-            'src/bs/platform.ts', 'src/bs/sidebar.ts', 'src/bs/workspace.css', 'src/bs/mount.ts',
+            'src/bs/platform.ts', 'src/bs/ResponsiveSidebar.svelte', 'src/bs/workspace.css', 'src/bs/mount.ts',
             'tests/bs/fixture.ts', 'tests/bs/layout_probe.py', 'tests/bs/browser_ui.py',
         ]
         report = {

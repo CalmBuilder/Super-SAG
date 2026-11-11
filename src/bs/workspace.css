@@ -1,38 +1,46 @@
-/* Browser layout overrides for the shared desktop workspace. */
-body:has(.browser-client) { min-width: 0; }
+/* Browser viewport adaptation; the main workspace keeps the desktop styles. */
+html.browser-surface body { min-width: 0; }
 
-@media (max-width: 959px) {
-  .browser-client .shell,
+@media (width < 960px) {
+  .browser-client .shell { grid-template-columns: minmax(0, 1fr); }
   .browser-client.compact-sidebar .shell { grid-template-columns: minmax(0, 1fr); }
 
-  .browser-client .sidebar {
+  .navigation-sheet {
     position: fixed;
     inset: 0 auto 0 0;
-    width: min(280px, calc(100vw - 32px));
+    width: clamp(240px, 85vw, 320px);
+    max-width: calc(100vw - 32px);
     height: 100dvh;
-    z-index: 41;
-    visibility: hidden;
-    transform: translateX(-100%);
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    overflow: visible;
+    background: transparent;
+  }
+  .navigation-sheet::backdrop { background: var(--color-overlay); }
+  .navigation-sheet > .sidebar {
+    width: 100%;
+    height: 100%;
     box-shadow: 8px 0 32px var(--color-shadow);
   }
 
-  .browser-client.browser-sidebar-open .sidebar { visibility: visible; transform: none; }
-  .browser-sidebar-backdrop { position: fixed; inset: 0; z-index: 40; width: 100%; height: 100%; padding: 0; border-radius: 0; background: var(--color-overlay); }
-  body:has(.browser-client) #context-menu { z-index: 50; }
   .browser-client .workspace { margin: 0; border: 0; border-radius: 0; }
-  .browser-client .workspace-header { grid-template-columns: 32px 32px minmax(0, 1fr) 68px; gap: 4px; padding-inline: 8px; }
-  .browser-client .browser-sidebar-toggle { grid-column: 1; grid-row: 1; }
-  .browser-client .workspace-back { position: static; grid-column: 2; grid-row: 1; }
-  .browser-client .workspace-switch { grid-column: 3; grid-row: 1; width: min(100%, 300px); justify-self: center; }
+  .browser-client .workspace-header {
+    grid-template-columns: 2rem 2rem minmax(0, 1fr) 68px;
+    gap: 4px;
+    padding-inline: 8px;
+  }
+  .browser-client .browser-sidebar-toggle { grid-area: 1 / 1; }
+  .browser-client .workspace-back { position: static; grid-area: 1 / 2; }
+  .browser-client .workspace-switch { grid-area: 1 / 3; width: min(300px, 100%); justify-self: center; }
   .browser-client .workspace-switch .nav-item { padding-inline: 4px; gap: 4px; }
-  .browser-client .workspace-actions { grid-column: 4; grid-row: 1; }
-  .browser-client .ask-content > .welcome,
-  .browser-client .ask-content > .composer-wrap,
-  .browser-client .chat-messages { padding-inline: 16px; }
+  .browser-client .workspace-actions { grid-area: 1 / 4; }
+  .browser-client :is(.ask-content > .welcome, .ask-content > .composer-wrap, .chat-messages) { padding-inline: 16px; }
   .browser-client .search-page { min-width: 0; padding-inline: 16px; }
 }
 
-@media (max-width: 480px) {
+@media (width <= 480px) {
   .browser-client .workspace-switch .nav-item > span {
     position: absolute;
     width: 1px;

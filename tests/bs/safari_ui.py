@@ -22,6 +22,7 @@ from selenium.webdriver import ActionChains
 from selenium.common.exceptions import StaleElementReferenceException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.actions.action_builder import ActionBuilder
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
@@ -181,12 +182,13 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
         no_errors()
         record('folder expansion failure preserves collapsed state')
 
-        driver.get(origin + '/web/index.html')
-        wait.until(EC.text_to_be_present_in_element((By.CSS_SELECTOR, '.startup-error'), 'Web 服务尚未接通'))
         driver.execute_script('''
           localStorage.setItem('super-sag.web.v1.sag.sidebar.expanded', '{bad');
           localStorage.setItem('super-sag.web.v1.sag.search.history', '{}');
         ''')
+        driver.get(origin + '/web/index.html')
+        wait.until(EC.text_to_be_present_in_element((By.CSS_SELECTOR, '.startup-error'), 'Web 服务尚未接通'))
+        assert driver.execute_script("return localStorage.getItem('super-sag.web.v1.sag.sidebar.expanded')") == '{bad'
         visit(scenario='tree')
         wait.until(EC.text_to_be_present_in_element((By.CSS_SELECTOR, '.welcome h1'), '向你的文件提问'))
         assert driver.execute_script("return localStorage.getItem('super-sag.web.v1.sag.sidebar.expanded')") == '{bad'
@@ -241,9 +243,24 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
                 wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, '.sidebar')))
                 assert driver.execute_script('return document.querySelector("main.workspace").inert') is True
                 wait.until(lambda current: current.execute_script('return document.activeElement === document.querySelector(\'.sidebar-titlebar [aria-label="收起侧边栏"]\')'))
+                assert css('dialog.navigation-sheet').get_attribute('open') is not None
+                if width == 320:
+                    ActionChains(driver).send_keys(Keys.TAB).perform()
+                    assert driver.execute_script('return !!document.activeElement.closest("dialog.navigation-sheet")')
+                    record('drawer keyboard focus remains inside the modal')
                 css('.sidebar-titlebar [aria-label="收起侧边栏"]').click()
                 wait.until(EC.invisibility_of_element_located((By.CSS_SELECTOR, '.sidebar')))
                 wait.until(lambda current: current.execute_script('return document.activeElement === arguments[0]', toggle))
+                if width == 320:
+                    toggle.click()
+                    wait.until(lambda current: current.find_element(By.CSS_SELECTOR, 'dialog.navigation-sheet').get_attribute('open') is not None)
+                    action = ActionBuilder(driver)
+                    action.pointer_action.move_to_location(width - 5, 400)
+                    action.pointer_action.click()
+                    action.perform()
+                    wait.until(EC.invisibility_of_element_located((By.CSS_SELECTOR, '.sidebar')))
+                    wait.until(lambda current: current.execute_script('return document.activeElement === arguments[0]', toggle))
+                    record('drawer backdrop closes and restores focus')
                 toggle.click()
                 css('.sidebar [aria-label="设置"]').click()
                 wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, '[role="dialog"]')))
@@ -283,6 +300,13 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
             css('[aria-label="示例知识库 的文件夹选项"]').click()
             item = wait.until(EC.element_to_be_clickable((By.XPATH, "//*[@role='menuitem' and normalize-space()='搜索']")))
             assert driver.execute_script('const e=arguments[0],r=e.getBoundingClientRect();return e.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2))', item)
+            if width == 320:
+                ActionChains(driver).send_keys(Keys.ESCAPE).perform()
+                wait.until(lambda current: not current.find_elements(By.CSS_SELECTOR, '[role="menu"]'))
+                assert css('dialog.navigation-sheet').get_attribute('open') is not None
+                css('[aria-label="示例知识库 的文件夹选项"]').click()
+                item = wait.until(EC.element_to_be_clickable((By.XPATH, "//*[@role='menuitem' and normalize-space()='搜索']")))
+                record('escaping a folder menu leaves the drawer open')
             item.click()
             wait.until(EC.text_to_be_present_in_element((By.CSS_SELECTOR, '.search-page h1'), '搜索你的文件'))
             wait.until(EC.invisibility_of_element_located((By.CSS_SELECTOR, '.sidebar')))
@@ -306,7 +330,7 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
         record('product entry rejects unavailable business without a fixture')
 
         source_names = ['src/App.svelte', 'src/lib/platform.ts', 'src/lib/storage.ts', 'src/lib/remember-scroll.ts',
-                        'src/bs/platform.ts', 'src/bs/sidebar.ts', 'src/bs/workspace.css', 'src/bs/mount.ts',
+                        'src/bs/platform.ts', 'src/bs/ResponsiveSidebar.svelte', 'src/bs/workspace.css', 'src/bs/mount.ts',
                         'tests/bs/fixture.ts', 'tests/bs/safari_ui.py']
         report = {
             'scope': 'actual Safari with isolated synthetic fixture; not Windows desktop or real Web business acceptance',

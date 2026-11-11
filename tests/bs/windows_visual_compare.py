@@ -20,7 +20,7 @@ from urllib.error import URLError
 from urllib.request import urlopen
 
 from playwright.sync_api import expect, sync_playwright
-from layout_probe import compare_layout, preference_layouts, workspace_layout
+from layout_probe import compare_layout, exercise_sidebar_collapse, preference_layouts, workspace_layout
 
 if sys.platform != 'win32' or os.environ.get('GITHUB_ACTIONS') != 'true' or os.environ.get('RUNNER_ENVIRONMENT') != 'github-hosted':
     raise SystemExit('Run only on a disposable GitHub-hosted Windows runner.')
@@ -82,6 +82,10 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
             layouts['files'] = check_layout('files')
             page.evaluate('document.activeElement.blur()')
             page.screenshot(path=str(output / 'browser-files.png'), animations='disabled')
+            page.get_by_role('button', name='问答', exact=True).click()
+            expect(page.locator('.welcome h1')).to_have_text('向你的文件提问')
+            layouts['ask_collapsed'] = exercise_sidebar_collapse(page, output, 'browser')
+            compare_layout('ask_collapsed', native_report['layout']['ask_collapsed'], layouts['ask_collapsed'])
             preference_views = preference_layouts(page, output, 'browser')
             for view, coordinates_by_selector in preference_views.items():
                 compare_layout(view, native_report['layout'][view], coordinates_by_selector)
@@ -95,6 +99,7 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
                 'sha256': {name: hashlib.sha256((output / name).read_bytes()).hexdigest()
                            for name in ('windows-ask.png', 'windows-search.png', 'windows-files.png',
                                         'browser-ask.png', 'browser-search.png', 'browser-files.png',
+                                        'windows-ask-collapsed.png', 'browser-ask-collapsed.png',
                                         'windows-ask-dark.png', 'browser-ask-dark.png',
                                         'windows-ask-en-dark.png', 'browser-ask-en-dark.png')},
             }
