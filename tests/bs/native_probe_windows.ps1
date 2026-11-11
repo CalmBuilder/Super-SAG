@@ -10,6 +10,7 @@ New-Item -ItemType Directory -Path $data -Force | Out-Null
 $env:SAG_DATA_DIR=$data
 $env:SAG_DESKTOP_DATA_DIR=$data
 $env:WEBVIEW2_USER_DATA_FOLDER=Join-Path $probeDirectory 'webview'
+$env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS='--force-renderer-accessibility'
 $desktop=Join-Path $InstallDirectory 'sag-desktop.exe'
 $cli=Join-Path $InstallDirectory 'bin\sag.exe'
 $process=$null
