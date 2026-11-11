@@ -20,3 +20,15 @@ export const appStorage = {
     }
   },
 };
+
+/** Ignore malformed preferences without deleting them or blocking the workspace. */
+export function readStoredStringList(key: string): string[] {
+  const value = appStorage.getItem(key);
+  if (value === null) return [];
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return Array.isArray(parsed) && parsed.every(item => typeof item === 'string') ? parsed : [];
+  } catch {
+    return [];
+  }
+}

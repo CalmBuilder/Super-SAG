@@ -181,6 +181,27 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
         no_errors()
         record('folder expansion failure preserves collapsed state')
 
+        driver.execute_script('''
+          localStorage.setItem('super-sag.web.v1.sag.sidebar.expanded', '{bad');
+          localStorage.setItem('super-sag.web.v1.sag.search.history', '{}');
+        ''')
+        driver.get(origin + '/web/index.html')
+        wait.until(EC.text_to_be_present_in_element((By.CSS_SELECTOR, '.startup-error'), 'Web 服务尚未接通'))
+        assert driver.execute_script("return localStorage.getItem('super-sag.web.v1.sag.sidebar.expanded')") == '{bad'
+        visit(scenario='tree')
+        wait.until(EC.text_to_be_present_in_element((By.CSS_SELECTOR, '.welcome h1'), '向你的文件提问'))
+        assert driver.execute_script("return localStorage.getItem('super-sag.web.v1.sag.sidebar.expanded')") == '{bad'
+        assert driver.execute_script("return localStorage.getItem('super-sag.web.v1.sag.search.history')") == '{}'
+        nav('搜索')
+        wait.until(EC.text_to_be_present_in_element((By.CSS_SELECTOR, '.search-page h1'), '搜索你的文件'))
+        assert not driver.find_elements(By.CSS_SELECTOR, '.search-history')
+        no_errors()
+        record('malformed browser preferences do not block startup and remain unchanged')
+        driver.execute_script('''
+          localStorage.removeItem('super-sag.web.v1.sag.sidebar.expanded');
+          localStorage.removeItem('super-sag.web.v1.sag.search.history');
+        ''')
+
         driver.get(origin + '/web/index.html')
         wait.until(EC.text_to_be_present_in_element((By.CSS_SELECTOR, '.startup-error'), 'Web 服务尚未接通'))
         driver.execute_script('''

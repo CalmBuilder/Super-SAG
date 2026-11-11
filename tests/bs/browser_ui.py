@@ -161,6 +161,23 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
             context = browser.new_context(viewport={'width': 1280, 'height': 800}, locale='zh-CN')
             page = context.new_page()
             page.on('pageerror', lambda error: errors.append(str(error)))
+            page.add_init_script('''
+              localStorage.setItem('super-sag.web.v1.sag.sidebar.expanded', '{bad');
+              localStorage.setItem('super-sag.web.v1.sag.search.history', '{}');
+            ''')
+            page.goto(origin + '/tests/bs/index.html?scenario=tree', wait_until='networkidle')
+            expect(page.locator('.welcome h1')).to_have_text('向你的文件提问')
+            assert page.evaluate("localStorage.getItem('super-sag.web.v1.sag.sidebar.expanded')") == '{bad'
+            assert page.evaluate("localStorage.getItem('super-sag.web.v1.sag.search.history')") == '{}'
+            page.get_by_role('button', name='搜索', exact=True).click()
+            expect(page.locator('.search-page h1')).to_have_text('搜索你的文件')
+            expect(page.locator('.search-history')).to_have_count(0)
+            record('malformed browser preferences do not block startup and remain unchanged')
+            context.close()
+
+            context = browser.new_context(viewport={'width': 1280, 'height': 800}, locale='zh-CN')
+            page = context.new_page()
+            page.on('pageerror', lambda error: errors.append(str(error)))
             page.goto(origin + '/web/index.html', wait_until='networkidle')
             page.evaluate('''() => {
               localStorage.setItem('sag.sidebar.expanded', '{old invalid value');
@@ -259,12 +276,16 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
             context = browser.new_context(viewport={'width': 1280, 'height': 800})
             page = context.new_page()
             page.on('pageerror', lambda error: errors.append(str(error)))
-            page.add_init_script("localStorage.setItem('sag.sidebar.expanded', '{old invalid value'); localStorage.setItem('sag.search.history', '{old invalid value');")
+            page.add_init_script("""localStorage.setItem('sag.sidebar.expanded', '{old invalid value');
+              localStorage.setItem('sag.search.history', '{old invalid value');
+              localStorage.setItem('super-sag.web.v1.sag.sidebar.expanded', '{bad');
+              localStorage.setItem('super-sag.web.v1.sag.search.history', '{}');""")
             page.goto(origin + '/web/index.html', wait_until='networkidle')
             expect(page.locator('.startup-error')).to_contain_text('Web 服务尚未接通')
             assert page.evaluate("typeof window.__BS_TEST__") == 'undefined'
             assert page.evaluate("typeof window.__TAURI_INTERNALS__") == 'undefined'
             assert page.evaluate("localStorage.getItem('sag.sidebar.expanded')") == '{old invalid value'
+            assert page.evaluate("localStorage.getItem('super-sag.web.v1.sag.sidebar.expanded')") == '{bad'
             record('product entry rejects unavailable business without a fixture')
             context.close()
 
