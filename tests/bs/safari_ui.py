@@ -270,6 +270,7 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
         wait.until(EC.text_to_be_present_in_element((By.CSS_SELECTOR, '.startup-error'), 'Web 服务尚未接通'))
         assert driver.execute_script('return typeof window.__BS_TEST__') == 'undefined'
         assert driver.execute_script('return typeof window.__TAURI_INTERNALS__') == 'undefined'
+        assert driver.execute_script("return localStorage.getItem('sag.sidebar.expanded')") == '{old invalid value'
         record('product entry rejects unavailable business without a fixture')
 
         source_names = ['src/App.svelte', 'src/lib/platform.ts', 'src/bs/platform.ts', 'src/bs/sidebar.ts',

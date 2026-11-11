@@ -255,10 +255,12 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
             context = browser.new_context(viewport={'width': 1280, 'height': 800})
             page = context.new_page()
             page.on('pageerror', lambda error: errors.append(str(error)))
+            page.add_init_script("localStorage.setItem('sag.sidebar.expanded', '{old invalid value'); localStorage.setItem('sag.search.history', '{old invalid value');")
             page.goto(origin + '/web/index.html', wait_until='networkidle')
             expect(page.locator('.startup-error')).to_contain_text('Web 服务尚未接通')
             assert page.evaluate("typeof window.__BS_TEST__") == 'undefined'
             assert page.evaluate("typeof window.__TAURI_INTERNALS__") == 'undefined'
+            assert page.evaluate("localStorage.getItem('sag.sidebar.expanded')") == '{old invalid value'
             record('product entry rejects unavailable business without a fixture')
             context.close()
 
