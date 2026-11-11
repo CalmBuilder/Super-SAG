@@ -6,11 +6,12 @@ import type {Root, Settings} from '../../src/lib/types';
 
 const params = new URLSearchParams(location.search);
 const scenario = params.get('scenario') ?? 'normal';
+const desktopBaseline = scenario === 'desktop-baseline';
 const lang = params.get('lang') === 'en' ? 'en' : 'zh-CN';
 let settings: Settings = {
   language: lang, theme: params.get('theme') === 'dark' ? 'dark' : 'light', start_page: 'ask',
   editor_size: 15, show_hidden: false, watch: true, index_workers: 8, excluded: ['.git'],
-  answer: {url: '', model: '', models: [], has_key: false},
+  answer: {url: '', model: desktopBaseline ? 'qwen3.6-flash' : '', models: desktopBaseline ? ['qwen3.6-flash'] : [], has_key: false},
   jev: {url: '', model: '', models: [], has_key: false},
   retrieval: {candidate_k: 50, seed_k: 10, expansion_term_limit: 20, max_hops: 1, top_k: 10, chunk_chars: 512},
   timeout_secs: 120, answer_context_tokens: 65536, answer_output_tokens: 2048,
@@ -22,7 +23,9 @@ const roots: Root[] = scenario === 'empty' ? [] : scenario === 'many'
       path: `/test/folder-${index}`, name: `${index}-${'示例文件夹'.repeat(18)}`,
       status: 'ready', count: index, error: null,
     }))
-  : [{path: '/test/library', name: '示例知识库', status: 'ready', count: 1, error: null}];
+  : desktopBaseline
+    ? [{path: '/test/super-sag', name: 'Super-SAG', status: 'ready', count: 0, error: null}]
+    : [{path: '/test/library', name: '示例知识库', status: 'ready', count: 1, error: null}];
 const calls: string[] = [];
 const pageErrors: string[] = [];
 window.addEventListener('error', event => pageErrors.push(event.message));
@@ -52,7 +55,7 @@ const platform: AppPlatform = {
         result = null;
         break;
       case 'list_roots': result = roots; break;
-      case 'list_files': result = scenario === 'empty' ? [] : [{id: 1, path: '/test/library/example.md', name: 'example.md'}]; break;
+      case 'list_files': result = scenario === 'empty' || desktopBaseline ? [] : [{id: 1, path: '/test/library/example.md', name: 'example.md'}]; break;
       case 'list_entries': result = []; break;
       case 'get_index_status': result = {paused: false, tasks: []}; break;
       case 'list_removed_directories':

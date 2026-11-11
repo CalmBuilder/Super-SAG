@@ -62,7 +62,7 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
             page = browser.new_page(viewport={'width': viewport[0], 'height': viewport[1]}, locale='zh-CN')
             errors: list[str] = []
             page.on('pageerror', lambda error: errors.append(str(error)))
-            page.goto(origin + '/tests/bs/index.html', wait_until='networkidle')
+            page.goto(origin + '/tests/bs/index.html?scenario=desktop-baseline', wait_until='networkidle')
             def check_layout(view: str) -> dict[str, dict[str, float]]:
                 browser_layout = workspace_layout(page)
                 for selector, coordinates in native_report['layout'][view].items():
@@ -88,7 +88,7 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
             page.screenshot(path=str(output / 'browser-files.png'), animations='disabled')
             assert not errors, errors
             report = {
-                'scope': 'same Windows runner and viewport; browser uses synthetic fixture with different folder/model data',
+                'scope': 'same Windows runner and viewport; browser uses synthetic empty folder and matching display settings',
                 'viewport': {'width': viewport[0], 'height': viewport[1]},
                 'browser': 'Microsoft Edge', 'browser_version': browser.version,
                 'layout': layouts,
