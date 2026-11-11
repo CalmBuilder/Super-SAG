@@ -21,18 +21,27 @@ def compare_layout(view, desktop, browser, tolerance=2):
                 raise AssertionError(f'{view} {selector} {key}: desktop={value}, browser={actual}')
 
 
-def exercise_sidebar_collapse(page):
+def exercise_sidebar_collapse(page, output=None, prefix=''):
     initial_width = page.locator('.sidebar').bounding_box()['width']
     page.get_by_role('button', name='收起侧边栏', exact=True).click()
     expect(page.locator('.real-client')).to_have_class(re.compile(r'\bcompact-sidebar\b'))
-    page.wait_for_function("initial => document.querySelector('.sidebar').getBoundingClientRect().width < initial - 30", arg=initial_width)
+    page.wait_for_function('''initial => {
+      const shell = document.querySelector('.shell');
+      const width = document.querySelector('.sidebar').getBoundingClientRect().width;
+      return width < initial - 30 && !shell.getAnimations().some(a => a.playState === 'running');
+    }''', arg=initial_width)
     compact_width = page.locator('.sidebar').bounding_box()['width']
     assert compact_width < initial_width, (initial_width, compact_width)
+    collapsed_layout = workspace_layout(page)
+    if output is not None:
+        page.evaluate('document.activeElement.blur()')
+        page.screenshot(path=str(output / f'{prefix}-ask-collapsed.png'), animations='disabled')
     page.get_by_role('button', name='展开侧边栏', exact=True).click()
     expect(page.locator('.real-client')).not_to_have_class(re.compile(r'\bcompact-sidebar\b'))
     page.wait_for_function("initial => Math.abs(document.querySelector('.sidebar').getBoundingClientRect().width - initial) <= 1", arg=initial_width)
     restored_width = page.locator('.sidebar').bounding_box()['width']
     assert abs(restored_width - initial_width) <= 1, (initial_width, restored_width)
+    return collapsed_layout
 
 
 def preference_layouts(page, output, prefix):

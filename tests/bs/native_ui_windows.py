@@ -52,7 +52,7 @@ with sync_playwright() as playwright:
     page.screenshot(path=str(output / 'windows-files.png'), animations='disabled')
     page.get_by_role('button', name='问答', exact=True).click()
     expect(page.locator('.welcome h1')).to_have_text('向你的文件提问')
-    exercise_sidebar_collapse(page)
+    layouts['ask_collapsed'] = exercise_sidebar_collapse(page, output, 'windows')
     page.get_by_role('button', name='设置', exact=True).click()
     expect(page.get_by_role('dialog')).to_be_visible()
     page.get_by_role('button', name='关闭设置').click()
