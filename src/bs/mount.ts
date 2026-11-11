@@ -16,7 +16,14 @@ import './workspace.css';
 export function mountBrowser(target: Element, platform: AppPlatform = createBrowserPlatform()) {
   const restorePlatform = setAppPlatform(platform);
   const restoreStorage = setStorageNamespace(BROWSER_STORAGE_NAMESPACE);
-  const restore = () => { restoreStorage(); restorePlatform(); };
+  const html = document.documentElement;
+  const hadBrowserSurface = html.classList.contains('browser-surface');
+  html.classList.add('browser-surface');
+  const restore = () => {
+    if (!hadBrowserSurface) html.classList.remove('browser-surface');
+    restoreStorage();
+    restorePlatform();
+  };
   try {
     const app = mount(App, {target, props: {surface: 'browser'}});
     return {app, async destroy() { try { await unmount(app); } finally { restore(); } }};
