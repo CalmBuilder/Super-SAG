@@ -41,7 +41,7 @@ fn folders_keep_independent_types_and_manual_ignore_rules_across_scans() {
     let rule_after = fs::read_to_string(a.join(".sagignore")).unwrap();
     assert!(rule_after.starts_with("# Custom rule\nignored.md\n"));
     assert_ne!(rule_before, rule_after);
-    assert_eq!(rule_after.matches("# SAG Wiki index options: begin").count(), 1);
+    assert_eq!(rule_after.matches("# Super-SAG index options: begin").count(), 1);
     store.scan(&a_root, |_| {}).unwrap();
     let files = store.files().unwrap();
     assert_eq!(files.len(), 3);
@@ -78,6 +78,57 @@ fn malformed_managed_blocks_are_reported_without_overwriting_custom_rules() {
     assert!(folder_index::read(temp.path()).is_err());
     assert!(folder_index::write(temp.path(), &options(true, false)).is_err());
     assert_eq!(fs::read_to_string(temp.path().join(".sagignore")).unwrap(), original);
+}
+
+#[test]
+fn old_rule_blocks_remain_readable_and_preserve_their_compatibility_format() {
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join(".sagignore");
+    let before = options(true, false);
+    let original = format!("\u{feff}# 手写规则\r\nprivate/\r\n# SAG Wiki index options: begin\r\n# {}\r\n# SAG Wiki index options: end\r\nkeep.txt", serde_json::to_string(&before).unwrap());
+    fs::write(&path, &original).unwrap();
+    assert_eq!(folder_index::read(temp.path()).unwrap(), Some(before));
+    let after = options(false, true);
+    folder_index::write(temp.path(), &after).unwrap();
+    let updated = fs::read_to_string(&path).unwrap();
+    assert!(updated.starts_with("\u{feff}# 手写规则\r\nprivate/\r\n# SAG Wiki index options: begin\r\n"));
+    assert!(updated.ends_with("# SAG Wiki index options: end\r\nkeep.txt"));
+    assert!(!updated.contains("# Super-SAG index options:"));
+    assert_eq!(folder_index::read(temp.path()).unwrap(), Some(after));
+}
+
+#[test]
+fn new_blocks_use_the_current_brand_without_touching_unmanaged_text() {
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join(".sagignore");
+    fs::write(&path, "\u{feff}# 手写规则\r\nprivate/").unwrap();
+    let selected = options(true, false);
+    folder_index::write(temp.path(), &selected).unwrap();
+    let updated = fs::read_to_string(&path).unwrap();
+    assert!(updated.starts_with("\u{feff}# 手写规则\r\nprivate/\r\n# Super-SAG index options: begin\r\n"));
+    assert!(!updated.contains("# SAG Wiki index options:"));
+    assert_eq!(folder_index::read(temp.path()).unwrap(), Some(selected));
+}
+
+#[test]
+fn ambiguous_or_damaged_blocks_do_not_change_the_file() {
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join(".sagignore");
+    let json = serde_json::to_string(&options(true, false)).unwrap();
+    let cases = [
+        format!("# Super-SAG index options: begin\n# {json}\n# SAG Wiki index options: end\nprivate/\n"),
+        format!("# Super-SAG index options: begin\n# {json}\n# Super-SAG index options: end\n# SAG Wiki index options: begin\n# {json}\n# SAG Wiki index options: end\n"),
+        format!("# Super-SAG index options: begin\n# SAG Wiki index options: begin\n# {json}\n# SAG Wiki index options: end\n# Super-SAG index options: end\n"),
+        "# Super-SAG index options: end\n".to_owned(),
+        "# Super-SAG index options: begin\n# invalid-json\n# Super-SAG index options: end\n".to_owned(),
+        format!("# Super-SAG index options: begin\n# {json}\n# user comment\n# Super-SAG index options: end\n"),
+    ];
+    for original in cases {
+        fs::write(&path, &original).unwrap();
+        assert!(folder_index::read(temp.path()).is_err(), "{original}");
+        assert!(folder_index::write(temp.path(), &options(false, true)).is_err(), "{original}");
+        assert_eq!(fs::read_to_string(&path).unwrap(), original);
+    }
 }
 
 #[test]

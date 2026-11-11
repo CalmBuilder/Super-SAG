@@ -3,7 +3,16 @@ import {fileURLToPath} from 'node:url';
 import {resolve} from 'node:path';
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
-const version = JSON.parse(readFileSync(resolve(root, 'node_modules/@tauri-apps/cli/package.json'), 'utf8')).version;
+let cliPackage;
+try {
+  cliPackage = readFileSync(resolve(root, 'node_modules/@tauri-apps/cli/package.json'), 'utf8');
+} catch (error) {
+  if (error.code === 'ENOENT') {
+    throw new Error('Desktop build dependencies are missing. Run npm ci in this repository first (Windows PowerShell: npm.cmd ci).');
+  }
+  throw error;
+}
+const version = JSON.parse(cliPackage).version;
 if (version !== '2.12.2') {
   throw new Error(`Windows installer template requires Tauri CLI 2.12.2, found ${version}. Review and update the pinned template before building.`);
 }
@@ -19,6 +28,9 @@ for (const required of [
 const config = JSON.parse(readFileSync(resolve(root, 'src-tauri/tauri.windows.conf.json'), 'utf8'));
 const baseConfig = JSON.parse(readFileSync(resolve(root, 'src-tauri/tauri.conf.json'), 'utf8'));
 const windows = config.app?.windows ?? [];
+if (config.bundle?.windows?.allowDowngrades !== false) {
+  throw new Error('Windows installer downgrade protection must remain enabled.');
+}
 const main = windows.find(window => window.label === 'main');
 const quick = windows.find(window => window.label === 'quick-search');
 if (!main || !quick || quick.url !== 'index.html?quick-search' || quick.visible !== false || quick.skipTaskbar !== true) {

@@ -44,6 +44,7 @@
       "clipper/sag-web-clipper-chrome.zip": "clipper/sag-web-clipper-chrome.zip"
     },
     "windows": {
+      "allowDowngrades": false,
       "nsis": {
         "languages": [
           "English",

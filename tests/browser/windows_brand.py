@@ -71,17 +71,32 @@ with tempfile.TemporaryFile(mode='w+') as log:
                         page.screenshot(path=str(OUTPUT / f'about-{language}.png'))
                     results.append({'language':language,'width':width,'height':height,'theme':theme,'status':'passed'})
                     context.close()
-                context = browser.new_context(viewport={'width':1280,'height':720}, locale=language, reduced_motion='reduce')
-                context.add_init_script(fixture + observe + "\nlocalStorage.removeItem('sag.onboarding.seen');\n")
-                page = context.new_page()
-                page.on('pageerror', lambda error: errors.append(str(error)))
-                page.goto(f'{origin}/?lang={language}', wait_until='networkidle')
-                dialog = page.get_by_role('dialog')
-                expect(dialog).to_be_visible()
-                expect(dialog.locator('.onboarding-header b')).to_have_text('Super-SAG')
-                assert dialog.locator('.onboarding-header img').evaluate('(image)=>image.complete && image.naturalWidth > 0')
-                results.append({'language':language,'case':'first-run guide','status':'passed'})
-                context.close()
+                titles = (['你的文件，就是知识库。','顺着线索，找到更多。','答案清楚，出处明确。','开始使用 Super-SAG。'] if language == 'zh-CN' else
+                          ['Your files. Your knowledge base.','Follow the clues. Find more.','Clear answers. Traceable sources.','Get started with Super-SAG.'])
+                for width, height in [(960,600), (1280,720), (1920,1080)]:
+                    context = browser.new_context(viewport={'width':width,'height':height}, locale=language, reduced_motion='reduce')
+                    context.add_init_script(fixture + observe + "\nlocalStorage.removeItem('sag.onboarding.seen');\n")
+                    page = context.new_page()
+                    page.on('pageerror', lambda error: errors.append(str(error)))
+                    page.goto(f'{origin}/?lang={language}', wait_until='networkidle')
+                    dialog = page.get_by_role('dialog')
+                    expect(dialog).to_be_visible()
+                    expect(dialog.locator('.onboarding-header b')).to_have_text('Super-SAG')
+                    assert dialog.locator('.onboarding-header img').evaluate('(image)=>image.complete && image.naturalWidth > 0')
+                    assert not any(text in dialog.text_content() for text in ['SOTA','HotpotQA','200 毫秒','200 ms','最轻。最快。最准。','Lightest. Fastest.'])
+                    for index, title in enumerate(titles):
+                        dialog.locator('.onboarding-pagination button').nth(index).click()
+                        expect(dialog.locator('.onboarding-slide[data-current="true"] h2')).to_have_text(title)
+                        if index == 0:
+                            dialog.get_by_role('button',name='查看本地索引说明' if language == 'zh-CN' else 'View local indexing details').click()
+                            expect(page.locator('.onboarding-benchmark-popover')).to_contain_text('文件数量' if language == 'zh-CN' else 'number')
+                        if index == 1:
+                            dialog.get_by_role('button',name='检索与原文' if language == 'zh-CN' else 'Retrieval and sources').click()
+                            expect(page.locator('.onboarding-benchmark-popover')).to_contain_text('Jev')
+                    dialog.get_by_role('button',name='开始使用' if language == 'zh-CN' else 'Get started',exact=True).click()
+                    expect(dialog).to_have_count(0)
+                    results.append({'language':language,'width':width,'height':height,'case':'first-run guide: all four pages','status':'passed'})
+                    context.close()
             assert not errors, errors
             browser_version = browser.version
             browser.close()

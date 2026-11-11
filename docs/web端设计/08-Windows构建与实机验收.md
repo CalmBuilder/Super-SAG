@@ -20,6 +20,8 @@ cargo --version
 
 准备 Windows x64、Node.js 24.15.0 或更高版本、Rust MSVC 工具链、Microsoft C++ 构建工具和 WebView2；构建依赖及安装工具需联网。
 
+新克隆目录必须先运行 `npm.cmd ci`；依赖只安装在各自目录，不能复用另一个克隆目录的 `node_modules`。安装程序对未识别的既有版本及匹配本产品标识的 MSI 安装采取保守拒绝策略；同版本静默重装也会拒绝。识别到指定测试构建时仅允许原目录覆盖，不能在安装器中先运行旧卸载器。真实旧版和已有数据升级仍需隔离环境验证；遇阻时保留原安装和数据，不要为了继续而勾选删除应用数据。
+
 ```powershell
 npm.cmd ci
 if ($LASTEXITCODE -ne 0) { throw 'npm ci failed' }

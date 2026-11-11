@@ -52,8 +52,8 @@ it('supports navigation, keyboard boundaries, native swiping, and mouse dragging
  click('下一步');await tick();expect(current()).toBe('顺着线索，找到更多。');
  window.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));await tick();expect(current()).toBe('答案清楚，出处明确。');
  click('上一步');await tick();expect(current()).toBe('顺着线索，找到更多。');
- node.scrollLeft=3*640;node.dispatchEvent(new Event('scroll'));await tick();expect(current()).toBe('最轻。最快。最准。');
- window.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));await tick();expect(current()).toBe('最轻。最快。最准。');
+ node.scrollLeft=3*640;node.dispatchEvent(new Event('scroll'));await tick();expect(current()).toBe('开始使用 Super-SAG。');
+ window.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));await tick();expect(current()).toBe('开始使用 Super-SAG。');
  click('教程第 1 页');await tick();
  node.dispatchEvent(new PointerEvent('pointerdown',{pointerType:'mouse',button:0,clientX:500,pointerId:1,bubbles:true}));
  node.dispatchEvent(new PointerEvent('pointermove',{pointerType:'mouse',clientX:350,pointerId:1,bubbles:true}));
@@ -72,14 +72,14 @@ it('finishes without making requests and translates all slides to English',async
 });
 
 it.each([
- [1,'查看建库速度依据','208 毫秒','顺着线索，找到更多。'],
- [2,'SOTA 召回 · 论文基准','HotpotQA','答案清楚，出处明确。'],
-])('keeps benchmark details collapsed on slide %s and closes them on navigation',async(page,trigger,detail,nextTitle)=>{
+ [1,'查看本地索引说明','文件数量','顺着线索，找到更多。'],
+ [2,'检索与原文','Jev','答案清楚，出处明确。'],
+])('keeps information collapsed on slide %s and closes it on navigation',async(page,trigger,detail,nextTitle)=>{
  app=mount(Onboarding,{target:document.body,props:{onClose:vi.fn()}});await tick();track();
  click(`教程第 ${page} 页`);await tick();
  expect(document.querySelector('.onboarding-benchmark-popover')).toBeNull();
  if(page===1){
-  document.querySelector('[aria-label="查看建库速度依据"]')!.dispatchEvent(new PointerEvent('pointerenter',{pointerType:'mouse'}));
+  document.querySelector('[aria-label="查看本地索引说明"]')!.dispatchEvent(new PointerEvent('pointerenter',{pointerType:'mouse'}));
  }else click(trigger);
  await vi.waitFor(()=>expect(document.querySelector('.onboarding-benchmark-popover')?.textContent).toContain(detail));
  window.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowRight',bubbles:true}));await tick();
@@ -89,12 +89,12 @@ it.each([
 
 it('opens indexing details on click and closes them with Escape',async()=>{
  app=mount(Onboarding,{target:document.body,props:{onClose:vi.fn()}});await tick();track();
- const trigger=document.querySelector<HTMLButtonElement>('[aria-label="查看建库速度依据"]')!;
+ const trigger=document.querySelector<HTMLButtonElement>('[aria-label="查看本地索引说明"]')!;
  trigger.dispatchEvent(new PointerEvent('pointerdown',{pointerType:'mouse',button:0,bubbles:true}));
  trigger.dispatchEvent(new PointerEvent('pointerup',{pointerType:'mouse',button:0,bubbles:true}));
  trigger.click();
- await vi.waitFor(()=>expect(document.querySelector('.onboarding-benchmark-popover')?.textContent).toContain('208 毫秒'));
- expect(trigger.textContent).toBe('建库约 200 毫秒 / 百万字');
+ await vi.waitFor(()=>expect(document.querySelector('.onboarding-benchmark-popover')?.textContent).toContain('文件数量'));
+ expect(trigger.textContent).toBe('本地建立索引');
  trigger.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));
  await vi.waitFor(()=>expect(document.querySelector('.onboarding-benchmark-popover')).toBeNull());
 });

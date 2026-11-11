@@ -17,7 +17,7 @@
   {label:'本地文件，直接接入',title:'你的文件，就是知识库。',description:'添加一个文件夹，文档、笔记和代码即刻进入本地索引。原文件留在原处。'},
   {label:'SAG2 · 深入检索',title:'顺着线索，找到更多。',description:'跨文件关联检索，减少重要信息的遗漏。'},
   {label:'有依据的回答',title:'答案清楚，出处明确。',description:'用自然语言提问，或输入 @ 指定文件。点击答案旁的引用，直接查看对应的原文位置。'},
-  {label:'准备就绪',title:'最轻。最快。最准。',description:'接入文件，连接模型，开始搜索和问答。你的知识，就在手边。'},
+  {label:'准备就绪',title:'开始使用 Super-SAG。',description:'接入文件，连接模型，开始搜索和问答。你的知识，就在手边。'},
  ];
  function go(next:number,instant=false){
   page=Math.max(0,Math.min(slides.length-1,next));
@@ -91,19 +91,19 @@
     <div class="onboarding-copy"><span class="onboarding-eyebrow">{$t(slide.label)}</span><h2>{$t(slide.title)}</h2><p>{$t(slide.description)}</p>
      {#if index===0}
       <Tooltip.Provider delayDuration={220}><Tooltip.Root bind:open={indexBenchmarkOpen} disabled={page!==0} disableCloseOnTriggerClick>
-       <Tooltip.Trigger class="onboarding-benchmark onboarding-index-speed" aria-label={$t('查看建库速度依据')} onclick={()=>indexBenchmarkOpen=true}>{$t('建库约 200 毫秒 / 百万字')}{@html icon('info')}</Tooltip.Trigger>
+       <Tooltip.Trigger class="onboarding-benchmark onboarding-index-speed" aria-label={$t('查看本地索引说明')} onclick={()=>indexBenchmarkOpen=true}>{$t('本地建立索引')}{@html icon('info')}</Tooltip.Trigger>
        <Tooltip.Portal><Tooltip.Content side="top" sideOffset={10} collisionPadding={16} forceMount>
         {#snippet child({props,wrapperProps,open})}
-         {#if open}<div {...wrapperProps}><div {...props} class="onboarding-benchmark-popover" aria-label={$t('建库速度依据')} transition:surface|global={{keyboard:keyboard.current}}><strong>{$t('SAG2 历史建库基准')}</strong><p>{$t('约 24.65 亿字符 · 511,962 份文档')}</p><p>{$t('完整流程 8 分 32 秒，包含文件清点、建库和完整性检查。全量平均每百万字符约 208 毫秒。')}</p><p>{$t('“字”按字符统计。历史本地基准采用 8 并发，并非当前客户端百万字单独计时；实际耗时随设备、文件数量和格式变化。')}</p></div></div>{/if}
+         {#if open}<div {...wrapperProps}><div {...props} class="onboarding-benchmark-popover" aria-label={$t('本地索引说明')} transition:surface|global={{keyboard:keyboard.current}}><strong>{$t('本地建立索引')}</strong><p>{$t('索引在本机建立，耗时取决于设备、文件数量、大小和格式。')}</p></div></div>{/if}
         {/snippet}
        </Tooltip.Content></Tooltip.Portal>
       </Tooltip.Root></Tooltip.Provider>
      {:else if index===1}
       <Popover.Root bind:open={benchmarkOpen}>
-       <Popover.Trigger class="onboarding-benchmark">{$t('SOTA 召回 · 论文基准')}{@html icon('info')}</Popover.Trigger>
+       <Popover.Trigger class="onboarding-benchmark">{$t('检索与原文')}{@html icon('info')}</Popover.Trigger>
        <Popover.Portal><Popover.Content side="top" sideOffset={10} collisionPadding={16} forceMount>
         {#snippet child({props,wrapperProps,open})}
-         {#if open}<div {...wrapperProps}><div {...props} class="onboarding-benchmark-popover" aria-label={$t('SAG 论文基准')} transition:surface|global={{keyboard:keyboard.current}}><strong>{$t('SAG 论文基准')}</strong><p>{$t('论文在 HotpotQA、2WikiMultiHopQA、MuSiQue 上领先所列对比方法；实际效果取决于资料和模型。')}</p></div></div>{/if}
+         {#if open}<div {...wrapperProps}><div {...props} class="onboarding-benchmark-popover" aria-label={$t('深入检索说明')} transition:surface|global={{keyboard:keyboard.current}}><strong>{$t('深入检索')}</strong><p>{$t('深入检索结合本地索引和已配置的 Jev 服务，返回可核对的原文片段。')}</p></div></div>{/if}
         {/snippet}
        </Popover.Content></Popover.Portal>
       </Popover.Root>

@@ -21,6 +21,7 @@ test('Windows template preflight accepts the pinned tool and rejects drift',()=>
     writeFileSync(templatePath,template);
     writeFileSync(windowsConfigPath,JSON.stringify(windowsConfig));
     const run=()=>spawnSync(process.execPath,[join(temporary,'scripts/check-windows-template.mjs')],{encoding:'utf8'});
+    const missingDependencies=run();assert.notEqual(missingDependencies.status,0);assert.match(missingDependencies.stderr,/npm\.cmd ci/);
     writeFileSync(cliPath,JSON.stringify({version:'2.12.2'}));
     assert.equal(run().status,0);
     writeFileSync(cliPath,JSON.stringify({version:'2.12.3'}));
@@ -29,6 +30,10 @@ test('Windows template preflight accepts the pinned tool and rejects drift',()=>
     writeFileSync(templatePath,template.replace('Uninstall\\SAG Wiki','Uninstall\\Super-SAG'));
     const wrongIdentity=run();assert.notEqual(wrongIdentity.status,0);assert.match(wrongIdentity.stderr,/upgrade identity/);
     writeFileSync(templatePath,template);
+    windowsConfig.bundle.windows.allowDowngrades=true;
+    writeFileSync(windowsConfigPath,JSON.stringify(windowsConfig));
+    const unsafeDowngrade=run();assert.notEqual(unsafeDowngrade.status,0);assert.match(unsafeDowngrade.stderr,/downgrade protection/);
+    windowsConfig.bundle.windows.allowDowngrades=false;
     windowsConfig.app.windows=windowsConfig.app.windows.filter(window=>window.label!=='quick-search');
     writeFileSync(windowsConfigPath,JSON.stringify(windowsConfig));
     const missingQuickSearch=run();assert.notEqual(missingQuickSearch.status,0);assert.match(missingQuickSearch.stderr,/quick-search windows/);

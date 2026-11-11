@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 ; Derived from Tauri CLI 2.12.2's NSIS template (MIT, see ../licenses/TAURI-MIT.txt).
 ; Keep the existing registry identity so an earlier installation is detected.
 ; Do not update this
@@ -81,6 +82,10 @@ Var NoShortcutMode
 Var WixMode
 Var OldMainBinaryName
 Var BaselineResetMigration
+Var FoundWixInstallation
+Var FoundNsisInstallation
+Var CompleteNsisInstallation
+Var RegisteredInstallDir
 
 Name "${PRODUCTNAME}"
 BrandingText "${COPYRIGHT}"
@@ -191,55 +196,16 @@ VIAddVersionKey "ProductVersion" "${VERSION}"
 ;    only if a previous installation was detected
 Var ReinstallPageCheck
 Page custom PageReinstall PageLeaveReinstall
-Function PageReinstall
-  ; Uninstall previous WiX installation if exists.
-  ;
-  ; A WiX installer stores the installation info in registry
-  ; using a UUID and so we have to loop through all keys under
-  ; `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall`
-  ; and check if `DisplayName` and `Publisher` keys match ${PRODUCTNAME} and ${MANUFACTURER}
-  ;
-  ; This has a potential issue that there maybe another installation that matches
-  ; our ${PRODUCTNAME} and ${MANUFACTURER} but wasn't installed by our WiX installer,
-  ; however, this should be fine since the user will have to confirm the uninstallation
-  ; and they can chose to abort it if doesn't make sense.
-  StrCpy $0 0
-  wix_loop:
-    EnumRegKey $1 HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall" $0
-    StrCmp $1 "" wix_loop_done ; Exit loop if there is no more keys to loop on
-    IntOp $0 $0 + 1
-    ReadRegStr $R0 HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$1" "DisplayName"
-    ReadRegStr $R1 HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$1" "Publisher"
-    StrCmp "$R0$R1" "${PRODUCTNAME}${MANUFACTURER}" 0 wix_loop
-    ReadRegStr $R0 HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$1" "UninstallString"
-    ${StrCase} $R1 $R0 "L"
-    ${StrLoc} $R0 $R1 "msiexec" ">"
-    StrCmp $R0 0 0 wix_loop_done
-    StrCpy $WixMode 1
-    StrCpy $R6 "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$1"
-    Goto compare_version
-  wix_loop_done:
 
-  ; Check if there is an existing installation, if not, abort the reinstall page
-  ReadRegStr $R0 SHCTX "${UNINSTKEY}" ""
-  ReadRegStr $R1 SHCTX "${UNINSTKEY}" "UninstallString"
-  ${IfThen} "$R0$R1" == "" ${|} Abort ${|}
-
-  ; Compare this installar version with the existing installation
-  ; and modify the messages presented to the user accordingly
-  compare_version:
-  StrCpy $R4 "$(older)"
-  ${If} $WixMode = 1
-    ReadRegStr $R0 HKLM "$R6" "DisplayVersion"
-  ${Else}
-    ReadRegStr $R0 SHCTX "${UNINSTKEY}" "DisplayVersion"
-  ${EndIf}
-  ${IfThen} $R0 == "" ${|} StrCpy $R4 "$(unknown)" ${|}
-  StrCpy $R9 $R0
+; Only the specifically identified pre-baseline release can cross the 0.1.0
+; version reset. Preserve registers used by the caller and treat all failures
+; (including an absent binary or a timeout) as an unrecognized installation.
+Function CheckBaselineReset
+  Push $R0
+  Push $R1
+  Push $R2
+  Push $R3
   StrCpy $BaselineResetMigration 0
-  ; Recognize only the exact, previously verified test build during the
-  ; version-series reset. Unknown newer installations keep normal downgrade
-  ; handling and are never silently treated as the baseline migration.
   ${If} "${VERSION}" == "0.1.0"
   ${AndIf} $R9 == "0.2.9"
   ${AndIf} $WixMode != 1
@@ -248,23 +214,174 @@ Function PageReinstall
       ReadRegStr $R1 SHCTX "${MANUPRODUCTKEY}" ""
       ${If} ${FileExists} "$R1\bin\sag.exe"
         nsExec::ExecToStack /TIMEOUT=5000 '"$R1\bin\sag.exe" --build-info'
+        Pop $R0
         Pop $R2
-        Pop $R3
-        ${If} $R2 == 0
-          ${StrLoc} $R3 $R3 '"build_id":"release-d0ef53a3834270d4"' ">"
+        ${If} $R0 == 0
+          ${StrLoc} $R3 $R2 '"version":"0.2.9"' ">"
           ${If} $R3 != ""
-            StrCpy $BaselineResetMigration 1
+            ${StrLoc} $R3 $R2 '"build_id":"release-d0ef53a3834270d4"' ">"
+            ${If} $R3 != ""
+              ${StrLoc} $R3 $R2 '"channel":"release"' ">"
+              ${If} $R3 != ""
+                ${StrLoc} $R3 $R2 '"protocol_version":2}' ">"
+                ${If} $R3 != ""
+                  StrCpy $BaselineResetMigration 1
+                ${EndIf}
+              ${EndIf}
+            ${EndIf}
           ${EndIf}
         ${EndIf}
       ${EndIf}
     ${EndIf}
   ${EndIf}
+  Pop $R3
+  Pop $R2
+  Pop $R1
+  Pop $R0
+FunctionEnd
+
+; Input: $R9 is the installed version. Output: $R0 is 0 (same), 1
+; (upgrade), or -1 (unsafe/downgrade). For the first release, unidentified
+; versions are conservatively refused instead of assuming a migration path.
+Function CompareInstalledVersion
+  ${If} $CompleteNsisInstallation != 1
+    StrCpy $R0 -1
+    Return
+  ${EndIf}
+  Call CheckBaselineReset
   ${If} $BaselineResetMigration == 1
     StrCpy $R0 1
+  ${ElseIf} $R9 == ""
+    StrCpy $R0 -1
+  ${ElseIf} "${VERSION}" == "0.1.0"
+  ${AndIf} $R9 != "0.1.0"
+    StrCpy $R0 -1
   ${Else}
     nsis_tauri_utils::SemverCompare "${VERSION}" $R9
     Pop $R0
+    ${If} $R0 != "0"
+    ${AndIf} $R0 != "1"
+      StrCpy $R0 -1
+    ${EndIf}
   ${EndIf}
+FunctionEnd
+
+Function StopUnsafeInstallation
+  ${Unless} ${Silent}
+    MessageBox MB_ICONSTOP "$(existingInstallationUnsafe)"
+  ${EndUnless}
+  SetErrorLevel 1
+  Quit
+FunctionEnd
+
+; Count damaged and partial registrations as existing installations too.
+; $R9 and the shared variables are outputs; other registers are preserved.
+Function CheckExistingNsis
+  Push $R0
+  Push $R1
+  Push $R2
+  ReadRegStr $R0 SHCTX "${UNINSTKEY}" ""
+  ReadRegStr $R1 SHCTX "${UNINSTKEY}" "UninstallString"
+  ReadRegStr $R2 SHCTX "${UNINSTKEY}" "DisplayName"
+  ReadRegStr $R9 SHCTX "${UNINSTKEY}" "DisplayVersion"
+  ReadRegStr $RegisteredInstallDir SHCTX "${MANUPRODUCTKEY}" ""
+  StrCpy $FoundNsisInstallation 0
+  StrCpy $CompleteNsisInstallation 0
+  ${If} "$R0$R1$R2$R9" != ""
+    StrCpy $FoundNsisInstallation 1
+    ${If} $R2 == "${PRODUCTNAME}"
+    ${AndIf} $R1 == '$\"$RegisteredInstallDir\uninstall.exe$\"'
+    ${AndIf} $R9 != ""
+    ${AndIf} $RegisteredInstallDir != ""
+    ${AndIf} ${FileExists} "$RegisteredInstallDir\uninstall.exe"
+      StrCpy $CompleteNsisInstallation 1
+    ${EndIf}
+  ${ElseIf} $RegisteredInstallDir != ""
+    ; The uninstaller deliberately keeps the old path when data is retained.
+    ; A path alone is harmless; remaining managed binaries are not.
+    ${If} ${FileExists} "$RegisteredInstallDir\${MAINBINARYNAME}.exe"
+    ${OrIf} ${FileExists} "$RegisteredInstallDir\bin\sag.exe"
+      StrCpy $FoundNsisInstallation 1
+    ${EndIf}
+  ${EndIf}
+  Pop $R2
+  Pop $R1
+  Pop $R0
+FunctionEnd
+
+!macro ScanWixView ROOT PREFIX
+  StrCpy $0 0
+  ${PREFIX}_loop:
+    EnumRegKey $1 ${ROOT} "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall" $0
+    StrCmp $1 "" ${PREFIX}_done
+    IntOp $0 $0 + 1
+    ReadRegStr $R0 ${ROOT} "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$1" "DisplayName"
+    ReadRegStr $R1 ${ROOT} "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$1" "Publisher"
+    ${If} "$R0$R1" == "${PRODUCTNAME}${MANUFACTURER}"
+      ReadRegStr $R0 ${ROOT} "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$1" "UninstallString"
+      ${StrCase} $R1 $R0 "L"
+      ${StrLoc} $R2 $R1 "msiexec" ">"
+      ${If} $R2 != ""
+        StrCpy $FoundWixInstallation 1
+        Goto ${PREFIX}_done
+      ${EndIf}
+    ${EndIf}
+    Goto ${PREFIX}_loop
+  ${PREFIX}_done:
+!macroend
+
+; The normal reinstall page detects matching MSI installs. Silent installs
+; skip that page, so refuse matching MSI registrations in all registry views.
+Function CheckExistingWix
+  Push $0
+  Push $1
+  Push $R0
+  Push $R1
+  Push $R2
+  StrCpy $FoundWixInstallation 0
+  !insertmacro ScanWixView HKCU wix_user
+  ${If} $FoundWixInstallation != 1
+    !insertmacro ScanWixView HKLM32 wix_32
+  ${EndIf}
+  ${If} ${RunningX64}
+  ${AndIf} $FoundWixInstallation != 1
+    !insertmacro ScanWixView HKLM64 wix_64
+  ${EndIf}
+  Pop $R2
+  Pop $R1
+  Pop $R0
+  Pop $1
+  Pop $0
+FunctionEnd
+
+Function PageReinstall
+  ; MSI migration requires a separate verified path. Never uninstall a
+  ; matching MSI as a side effect of starting this NSIS installer.
+  Call CheckExistingWix
+  ${If} $FoundWixInstallation == 1
+    Call StopUnsafeInstallation
+  ${EndIf}
+
+  ; A partial or damaged registration is not a fresh installation.
+  Call CheckExistingNsis
+  ${IfThen} $FoundNsisInstallation == 0 ${|} Abort ${|}
+
+  ; Compare this installar version with the existing installation
+  ; and modify the messages presented to the user accordingly
+  StrCpy $R4 "$(older)"
+  ${If} $WixMode = 1
+    ReadRegStr $R0 HKLM "$R6" "DisplayVersion"
+  ${Else}
+    ReadRegStr $R0 SHCTX "${UNINSTKEY}" "DisplayVersion"
+  ${EndIf}
+  ${IfThen} $R0 == "" ${|} StrCpy $R4 "$(unknown)" ${|}
+  StrCpy $R9 $R0
+  Call CompareInstalledVersion
+  !if "${ALLOWDOWNGRADES}" == "false"
+    ${If} $R0 == -1
+      Call StopUnsafeInstallation
+    ${EndIf}
+  !endif
   ; Reinstalling the same version
   ${If} $R0 = 0
     StrCpy $R1 "$(alreadyInstalledLong)"
@@ -319,6 +436,13 @@ Function PageReinstall
     !endif
     ${NSD_OnClick} $R3 PageReinstallUpdateSelection
 
+    ; The recognized reset migrates in place. Do not start the old
+    ; uninstaller before the new installation has passed safety checks.
+    ${If} $BaselineResetMigration == 1
+      EnableWindow $R2 0
+      StrCpy $ReinstallPageCheck 2
+    ${EndIf}
+
     ; For an upgrade, default to preserving the existing installation in place.
     ; The stock first choice invokes the previous uninstaller, which is not
     ; appropriate for the normal data-preserving migration.
@@ -349,6 +473,11 @@ Function PageReinstallUpdateSelection
 FunctionEnd
 Function PageLeaveReinstall
   ${NSD_GetState} $R2 $R1
+
+  ${If} $BaselineResetMigration == 1
+  ${AndIf} $R1 = 1
+    Abort
+  ${EndIf}
 
   ; If migrating from Wix, always uninstall
   ${If} $WixMode = 1
@@ -509,6 +638,9 @@ FunctionEnd
 {{#each languages}}
 !insertmacro MUI_LANGUAGE "{{this}}"
 {{/each}}
+LangString existingInstallationUnsafe ${LANG_ENGLISH} "The existing installation cannot be safely upgraded by this installer. No files were changed. Back up your data and verify the installed version first."
+LangString existingInstallationUnsafe ${LANG_SIMPCHINESE} "此安装程序无法安全升级现有安装，未修改任何文件。请先备份数据并核实已安装的版本。"
+LangString existingInstallationUnsafe ${LANG_TRADCHINESE} "此安裝程式無法安全升級現有安裝，未修改任何檔案。請先備份資料並確認已安裝的版本。"
 !insertmacro MUI_RESERVEFILE_LANGDLL
 {{#each language_files}}
   !include "{{this}}"
@@ -568,26 +700,62 @@ Function .onInit
   ${If} ${Silent}
   ${OrIf} $PassiveMode = 1
   ${OrIf} $UpdateMode = 1
-    ReadRegStr $R0 SHCTX "${UNINSTKEY}" "DisplayVersion"
-    nsis_tauri_utils::SemverCompare "${VERSION}" $R0
-    Pop $R0
-    ; If downgrading
-    ${If} $R0 = -1
-      ${If} ${Silent}
-        System::Call 'kernel32::AttachConsole(i -1)i.r0'
-        ${If} $0 <> 0
-          System::Call 'kernel32::GetStdHandle(i -11)i.r0'
-          System::call 'kernel32::SetConsoleTextAttribute(i r0, i 0x0004)' ; set red color
-          FileWrite $0 "$(silentDowngrades)"
-        ${EndIf}
-      ${Else}
-        MessageBox MB_ICONSTOP "$(silentDowngrades)"
+    Call CheckExistingWix
+    ${If} $FoundWixInstallation == 1
+      Call StopUnsafeInstallation
+    ${EndIf}
+    Call CheckExistingNsis
+    ${If} $FoundNsisInstallation == 1
+      Call CompareInstalledVersion
+      ; A same-version install may be an unknown newer build with a reset or
+      ; reused version number. Require an explicit interactive reinstall.
+      ${If} $R0 == -1
+      ${OrIf} $R0 == 0
+        Call StopUnsafeInstallation
       ${EndIf}
-      Abort
     ${EndIf}
   ${EndIf}
   !endif
 FunctionEnd
+
+; Recheck after the directory page and before writing any application files.
+; An upgrade must use the registered directory; an unregistered directory
+; containing managed binaries must be inspected rather than overwritten.
+Section -InstallationSafetyCheck
+  !if "${ALLOWDOWNGRADES}" == "false"
+  Call CheckExistingWix
+  ${If} $FoundWixInstallation == 1
+    Call StopUnsafeInstallation
+  ${EndIf}
+  Call CheckExistingNsis
+  ${If} $FoundNsisInstallation == 1
+    ${If} $RegisteredInstallDir == ""
+      Call StopUnsafeInstallation
+    ${EndIf}
+    GetFullPathName $R1 "$RegisteredInstallDir"
+    GetFullPathName $R2 "$INSTDIR"
+    ${If} $R1 != $R2
+      Call StopUnsafeInstallation
+    ${EndIf}
+    Call CompareInstalledVersion
+    ${If} $R0 == -1
+      Call StopUnsafeInstallation
+    ${EndIf}
+    ${If} ${Silent}
+    ${OrIf} $PassiveMode = 1
+    ${OrIf} $UpdateMode = 1
+      ${If} $R0 == 0
+        Call StopUnsafeInstallation
+      ${EndIf}
+    ${EndIf}
+  ${Else}
+    ${If} ${FileExists} "$INSTDIR\${MAINBINARYNAME}.exe"
+    ${OrIf} ${FileExists} "$INSTDIR\bin\sag.exe"
+      Call StopUnsafeInstallation
+    ${EndIf}
+  ${EndIf}
+  !endif
+SectionEnd
 
 Section WebView2
   ; Check if Webview2 is already installed and skip this section

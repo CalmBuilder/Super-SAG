@@ -200,7 +200,7 @@ fn add_selects_extensions_persists_them_and_replaces_only_the_requested_scope() 
     for (name, content) in sources { assert_eq!(fs::read_to_string(project.join(name)).unwrap(), content); }
     let rules = fs::read_to_string(project.join(".sagignore")).unwrap();
     assert!(rules.starts_with("# User rule\nignored.ts\n"));
-    assert_eq!(rules.matches("# SAG Wiki index options: begin").count(), 1);
+    assert_eq!(rules.matches("# Super-SAG index options: begin").count(), 1);
     assert!(run(&["service", "stop"]).status.success());
     let store = sag_core::store::Store::open(&data.join("sag.sqlite")).unwrap();
     let files = store.files().unwrap();

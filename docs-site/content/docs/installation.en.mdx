@@ -11,6 +11,8 @@ The installer includes the local CLI. After the desktop app initializes it, open
 
 <Callout title="Upgrading existing data">In-place upgrades still require Windows acceptance with isolated test data. Back up first; selecting “delete application data” in an uninstaller affects settings, indexes and conversations.</Callout>
 
+The `v0.1.0` installer allows an in-place upgrade only for the specifically identified test build. Unrecognized versions and MSI installations matching this product identity are stopped, leaving the existing installation in place. Silent same-version reinstalls are also stopped; an interactive reinstall requires an explicit choice. If the installed version cannot be verified, keep the installation and data in place and check the version and backups first. Legacy upgrades still require hands-on Windows validation.
+
 ## About and updates
 
 Open **Settings → About** to see the Super-SAG version and update status.

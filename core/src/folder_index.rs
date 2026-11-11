@@ -2,8 +2,15 @@ use anyhow::{bail, Context, Result};
 use sag_protocol::types::{FolderIndexOptions, Settings};
 use std::{collections::HashMap, fs, io::{ErrorKind, Write}, path::{Path, PathBuf}};
 
-const START: &str = "# SAG Wiki index options: begin";
-const END: &str = "# SAG Wiki index options: end";
+const START: &str = "# Super-SAG index options: begin";
+const END: &str = "# Super-SAG index options: end";
+const LEGACY_START: &str = "# SAG Wiki index options: begin";
+const LEGACY_END: &str = "# SAG Wiki index options: end";
+
+struct ManagedBlock {
+    range: std::ops::Range<usize>,
+    legacy: bool,
+}
 
 pub struct Rules {
     root: PathBuf,
@@ -60,34 +67,65 @@ fn content(root: &Path) -> Result<String> {
     }
 }
 
-fn block(content: &str) -> Result<Option<std::ops::Range<usize>>> {
-    let start = content.find(START);
-    let end = content.find(END);
-    match (start, end) {
-        (None, None) => Ok(None),
-        (Some(start), Some(end)) if start < end => Ok(Some(start..end + END.len())),
-        _ => bail!(".sagignore 中的索引选项标记不完整，请先修复该文件"),
+fn block(content: &str) -> Result<Option<ManagedBlock>> {
+    let mut result = None;
+    let mut open = None;
+    let mut offset = 0;
+    for part in content.split_inclusive('\n') {
+        let line = part.trim_end_matches(['\r', '\n']);
+        let line = if offset == 0 { line.strip_prefix('\u{feff}').unwrap_or(line) } else { line };
+        let marker = line.trim();
+        let start = match marker { START => Some(false), LEGACY_START => Some(true), _ => None };
+        let end = match marker { END => Some(false), LEGACY_END => Some(true), _ => None };
+        if let Some(legacy) = start {
+            if open.is_some() || result.is_some() {
+                bail!(".sagignore 中存在重复或嵌套的索引选项标记，请先修复该文件");
+            }
+            let prefix = part.find(marker).expect("marker belongs to this line");
+            open = Some((offset + prefix, legacy));
+        }
+        if let Some(legacy) = end {
+            let Some((start, start_legacy)) = open.take() else {
+                bail!(".sagignore 中的索引选项标记不完整，请先修复该文件");
+            };
+            if start_legacy != legacy || result.is_some() {
+                bail!(".sagignore 中的索引选项标记不匹配，请先修复该文件");
+            }
+            let prefix = part.find(marker).expect("marker belongs to this line");
+            result = Some(ManagedBlock { range: start..offset + prefix + marker.len(), legacy });
+        }
+        offset += part.len();
     }
+    if open.is_some() { bail!(".sagignore 中的索引选项标记不完整，请先修复该文件"); }
+    Ok(result)
+}
+
+fn parse_options(content: &str, block: &ManagedBlock) -> Result<FolderIndexOptions> {
+    let lines: Vec<_> = content[block.range.clone()].lines().collect();
+    if lines.len() != 3 { bail!(".sagignore 中的索引选项块包含意外内容，请先修复该文件"); }
+    let json = lines[1].strip_prefix("# ").context(".sagignore 中的索引选项格式不正确")?;
+    serde_json::from_str(json).context("无法解析 .sagignore 中的索引选项")
 }
 
 pub fn read(root: &Path) -> Result<Option<FolderIndexOptions>> {
     let content = content(root)?;
-    let Some(range) = block(&content)? else { return Ok(None); };
-    let json = content[range].lines().nth(1).context(".sagignore 中缺少索引选项")?;
-    let json = json.strip_prefix("# ").context(".sagignore 中的索引选项格式不正确")?;
-    Ok(Some(serde_json::from_str(json).context("无法解析 .sagignore 中的索引选项")?))
+    let Some(block) = block(&content)? else { return Ok(None); };
+    Ok(Some(parse_options(&content, &block)?))
 }
 
 pub fn write(root: &Path, options: &FolderIndexOptions) -> Result<()> {
     let path = root.join(".sagignore");
     let mut content = content(root)?;
-    let mut replacement = format!("{START}\n# {}\n", serde_json::to_string(options)?);
-    replacement.push_str(END);
-    if let Some(range) = block(&content)? { content.replace_range(range, &replacement); }
+    let existing = block(&content)?;
+    if let Some(block) = &existing { parse_options(&content, block)?; }
+    let newline = if content.contains("\r\n") { "\r\n" } else { "\n" };
+    let (start, end) = if existing.as_ref().is_some_and(|block| block.legacy) { (LEGACY_START, LEGACY_END) } else { (START, END) };
+    let replacement = format!("{start}{newline}# {}{newline}{end}", serde_json::to_string(options)?);
+    if let Some(block) = existing { content.replace_range(block.range, &replacement); }
     else {
-        if !content.is_empty() && !content.ends_with('\n') { content.push('\n'); }
+        if !content.is_empty() && !content.ends_with('\n') { content.push_str(newline); }
         content.push_str(&replacement);
-        content.push('\n');
+        content.push_str(newline);
     }
     let mut file = tempfile::NamedTempFile::new_in(root)?;
     if path.exists() { file.as_file().set_permissions(fs::metadata(&path)?.permissions())?; }

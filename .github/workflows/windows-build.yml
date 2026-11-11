@@ -38,7 +38,9 @@ jobs:
       - run: npm run check
       - run: npx vitest run tests/branding-assets.test.ts
       - run: cargo test --locked --manifest-path protocol/Cargo.toml
+      - run: cargo test --locked --manifest-path core/Cargo.toml --test folder_index_options
       - run: cargo test --locked --manifest-path cli/Cargo.toml --test commands
+      - run: cargo test --locked --manifest-path cli/Cargo.toml --test index_commands
       - run: cargo test --locked --manifest-path cli/Cargo.toml --bin sag install::export_tests
       - name: Exercise CLI guide using the Windows debug build
         shell: pwsh
@@ -70,3 +72,11 @@ jobs:
         run: |
           python tests/cli-guide-e2e.py --binary "$env:PACKAGED_CLI" --windows-hosted-runner
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Exercise installer upgrade safeguards
+        shell: pwsh
+        env:
+          SMOKE_DIRECTORY: ${{ steps.installed-package.outputs.directory }}
+        run: |
+          $installers = @(Get-ChildItem -Path src-tauri/target -Filter 'Super-SAG*setup.exe' -File -Recurse)
+          if ($installers.Count -ne 1) { throw "Expected one installer, found $($installers.Count)" }
+          & ./scripts/test-windows-installer-upgrade.ps1 -Installer $installers[0].FullName -SmokeDirectory "$env:SMOKE_DIRECTORY"

@@ -53,6 +53,11 @@ if (-not $SkipDesktop) {
             throw 'Desktop smoke testing requires clean default Documents folders; existing files have not been changed.'
         }
     }
+    foreach ($root in @($env:APPDATA, $env:LOCALAPPDATA)) {
+        if ($root -and (Test-Path -LiteralPath (Join-Path $root 'com.sag.desktop'))) {
+            throw 'Desktop smoke testing requires clean application-data folders; existing files have not been changed.'
+        }
+    }
 }
 
 $smokeDirectory = Join-Path ([IO.Path]::GetFullPath($env:RUNNER_TEMP)) ('sag-windows-smoke-' + [guid]::NewGuid().ToString('N'))

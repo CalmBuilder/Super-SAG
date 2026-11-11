@@ -9,6 +9,7 @@ describe('Super-SAG icon assets', () => {
   });
 
   it('keeps the Chrome, Safari and desktop icons consistent at their shared sizes', () => {
+    expect(bytes('src/assets/brand-icon.png')).toEqual(bytes('assets/branding/super-sag-icon.png'));
     for (const size of [16, 32, 128]) {
       const safari = bytes(`browser-extension/assets/macos/icon-${size}.png`);
       const chrome = bytes(`browser-extension/static/icon-${size}.png`);
