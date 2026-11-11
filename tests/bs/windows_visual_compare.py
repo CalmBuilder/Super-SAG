@@ -63,15 +63,15 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
             page.goto(origin + '/tests/bs/index.html', wait_until='networkidle')
             expect(page.locator('.welcome h1')).to_have_text('向你的文件提问')
             page.evaluate('document.activeElement.blur()')
-            page.screenshot(path=str(output / 'browser-ask.png'))
+            page.screenshot(path=str(output / 'browser-ask.png'), animations='disabled')
             page.get_by_role('button', name='搜索', exact=True).click()
             expect(page.locator('.search-page h1')).to_have_text('搜索你的文件')
             page.evaluate('document.activeElement.blur()')
-            page.screenshot(path=str(output / 'browser-search.png'))
+            page.screenshot(path=str(output / 'browser-search.png'), animations='disabled')
             page.get_by_role('button', name='文件', exact=True).click()
             expect(page.locator('.content')).to_contain_text('已索引文件')
             page.evaluate('document.activeElement.blur()')
-            page.screenshot(path=str(output / 'browser-files.png'))
+            page.screenshot(path=str(output / 'browser-files.png'), animations='disabled')
             assert not errors, errors
             report = {
                 'scope': 'same Windows runner and viewport; browser uses synthetic fixture with different folder/model data',
