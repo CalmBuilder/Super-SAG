@@ -16,6 +16,12 @@ $port=([System.Net.IPEndPoint]$listener.LocalEndpoint).Port
 $listener.Stop()
 $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS="--remote-debugging-port=$port --remote-debugging-address=127.0.0.1"
 $env:BS_NATIVE_DEBUG_PORT=$port
+$policyKey='HKLM:\SOFTWARE\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments'
+if ((Get-ItemProperty -Path $policyKey -Name 'sag-desktop.exe' -ErrorAction SilentlyContinue)) {
+  throw 'Refusing to overwrite an existing desktop WebView2 policy'
+}
+New-Item -Path $policyKey -Force | Out-Null
+New-ItemProperty -Path $policyKey -Name 'sag-desktop.exe' -Value "--remote-debugging-port=$port" -PropertyType String -Force | Out-Null
 $desktop=Join-Path $InstallDirectory 'sag-desktop.exe'
 $cli=Join-Path $InstallDirectory 'bin\sag.exe'
 $process=$null
@@ -43,4 +49,5 @@ try {
 } finally {
   if ($process) { $process.Refresh(); if (-not $process.HasExited) { Stop-Process -Id $process.Id -Force } }
   if (Test-Path -LiteralPath (Join-Path $data 'sag-service.json')) { & $cli service stop | Out-Null }
+  Remove-ItemProperty -Path $policyKey -Name 'sag-desktop.exe' -ErrorAction SilentlyContinue
 }
