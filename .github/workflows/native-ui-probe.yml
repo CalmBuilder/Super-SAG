@@ -1,0 +1,43 @@
+name: Temporary native UI accessibility probe
+on:
+  push:
+    branches: ['validation-native/**']
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-2025
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - name: Download the verified release installer
+        shell: pwsh
+        run: gh release download v0.1.0 --repo CalmBuilder/Super-SAG --pattern 'Super-SAG_0.1.0_x64-setup.exe' --dir "$env:RUNNER_TEMP"
+      - name: Install in isolation
+        id: install
+        shell: pwsh
+        run: ./scripts/smoke-windows.ps1 -Installer "$env:RUNNER_TEMP/Super-SAG_0.1.0_x64-setup.exe" -Version '0.1.0'
+      - name: Inspect native accessibility
+        shell: pwsh
+        env:
+          SMOKE_DIRECTORY: ${{ steps.install.outputs.directory }}
+        run: ./tests/bs/native_probe_windows.ps1 -InstallDirectory "$env:SMOKE_DIRECTORY/installation"
+  macos:
+    runs-on: macos-15
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - name: Download the previously built test DMG
+        run: |
+          gh release download v0.1.0 --repo CalmBuilder/Super-SAG --pattern 'Super-SAG-0.1.0-macOS-arm64.zip' --dir "$RUNNER_TEMP"
+          unzip -q "$RUNNER_TEMP/Super-SAG-0.1.0-macOS-arm64.zip" -d "$RUNNER_TEMP/mac-artifact"
+          mkdir -p src-tauri/target/release/bundle/dmg
+          cp "$RUNNER_TEMP"/mac-artifact/*.dmg src-tauri/target/release/bundle/dmg/
+      - name: Build and inspect accessibility tree
+        run: |
+          swiftc tests/bs/native_probe_macos.swift -o "$RUNNER_TEMP/native-ax-probe"
+          python3 scripts/smoke-macos.py --arch arm64

@@ -55,6 +55,9 @@ def verify_native_window(process, temporary):
             statement = f'tell application "System Events" to tell (first application process whose unix id is {process.pid}) to perform action "AXRaise" of window 1'
             try:
                 run('osascript', '-e', statement, timeout=15)
+                probe = subprocess.run([str(Path(os.environ['RUNNER_TEMP']) / 'native-ax-probe'), str(process.pid)],
+                                       text=True, capture_output=True, timeout=30)
+                print('ACCESSIBILITY_PROBE', probe.returncode, probe.stdout[-16000:], probe.stderr[-1000:])
                 return {'on_screen_windows': int(value), 'accessibility_raise': True}
             except subprocess.CalledProcessError as error:
                 last_error = (error.stderr or str(error))[-500:]
