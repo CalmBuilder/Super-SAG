@@ -110,6 +110,16 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
         no_errors()
         record('desktop-sized navigation and shared workspace', width=1280)
 
+        initial_width = css('.sidebar').rect['width']
+        clickable('[aria-label="收起侧边栏"]').click()
+        wait.until(lambda current: 'compact-sidebar' in current.find_element(By.CSS_SELECTOR, '.real-client').get_attribute('class').split())
+        assert css('.sidebar').rect['width'] < initial_width
+        clickable('[aria-label="展开侧边栏"]').click()
+        wait.until(lambda current: 'compact-sidebar' not in current.find_element(By.CSS_SELECTOR, '.real-client').get_attribute('class').split())
+        assert abs(css('.sidebar').rect['width'] - initial_width) <= 1
+        no_errors()
+        record('desktop-sized sidebar collapse and expand')
+
         ActionChains(driver).key_down(Keys.COMMAND).send_keys('k').key_up(Keys.COMMAND).perform()
         wait.until(EC.text_to_be_present_in_element((By.CSS_SELECTOR, '.search-page h1'), '搜索你的文件'))
         nav('问答')
@@ -273,8 +283,9 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
         assert driver.execute_script("return localStorage.getItem('sag.sidebar.expanded')") == '{old invalid value'
         record('product entry rejects unavailable business without a fixture')
 
-        source_names = ['src/App.svelte', 'src/lib/platform.ts', 'src/bs/platform.ts', 'src/bs/sidebar.ts',
-                        'src/bs/workspace.css', 'src/bs/mount.ts', 'tests/bs/fixture.ts', 'tests/bs/safari_ui.py']
+        source_names = ['src/App.svelte', 'src/lib/platform.ts', 'src/lib/storage.ts', 'src/lib/remember-scroll.ts',
+                        'src/bs/platform.ts', 'src/bs/sidebar.ts', 'src/bs/workspace.css', 'src/bs/mount.ts',
+                        'tests/bs/fixture.ts', 'tests/bs/safari_ui.py']
         report = {
             'scope': 'actual Safari with isolated synthetic fixture; not Windows desktop or real Web business acceptance',
             'browser': driver.capabilities.get('browserName'),

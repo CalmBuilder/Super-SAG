@@ -19,6 +19,7 @@ from urllib.error import URLError
 from urllib.request import urlopen
 
 from playwright.sync_api import expect, sync_playwright
+from layout_probe import exercise_sidebar_collapse
 
 ROOT = Path(__file__).resolve().parents[2]
 parser = argparse.ArgumentParser()
@@ -90,6 +91,9 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
             expect(page.locator('.welcome h1')).to_have_text('向你的文件提问')
             page.screenshot(path=str(output / f'{args.browser}-workspace.png'))
             record('desktop-sized navigation and shared workspace', width=1280)
+
+            exercise_sidebar_collapse(page)
+            record('desktop-sized sidebar collapse and expand')
 
             page.keyboard.press('Control+k')
             expect(page.locator('.search-page h1')).to_have_text('搜索你的文件')
@@ -269,8 +273,9 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
             browser.close()
 
         source_names = [
-            'src/App.svelte', 'src/lib/platform.ts', 'src/bs/platform.ts', 'src/bs/sidebar.ts',
-            'src/bs/workspace.css', 'src/bs/mount.ts', 'tests/bs/fixture.ts', 'tests/bs/browser_ui.py',
+            'src/App.svelte', 'src/lib/platform.ts', 'src/lib/storage.ts', 'src/lib/remember-scroll.ts',
+            'src/bs/platform.ts', 'src/bs/sidebar.ts', 'src/bs/workspace.css', 'src/bs/mount.ts',
+            'tests/bs/fixture.ts', 'tests/bs/layout_probe.py', 'tests/bs/browser_ui.py',
         ]
         report = {
             'scope': 'shared UI with isolated synthetic fixture; not Windows desktop or real Web business acceptance',
