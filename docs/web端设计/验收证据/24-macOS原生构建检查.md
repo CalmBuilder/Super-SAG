@@ -13,6 +13,12 @@
 
 同一运行中的 Intel 构建和后续检查尚在执行；结果未出前不标为通过。
 
+## Safari 扩展源码检查
+
+[GitHub Actions 运行 42958141733](https://github.com/CalmBuilder/Super-SAG/actions/runs/42958141733) 使用验证提交 `b5253434d5b19ba292e10571c31187c14c209e54`。Apple 芯片和 Intel 的 macOS 15 中，Swift 文件保存和新旧默认目录测试均通过，包括中文内容、嵌套目录、不覆盖及路径边界；本地临时签名的 Safari 开发 app 和 DMG 构建及签名完整性检查均通过。
+
+上述构建早于中文引导标题的品牌修正；修正后另行启动[运行 42959347462](https://github.com/CalmBuilder/Super-SAG/actions/runs/42959347462)，基于提交 `15193f946bbb1543a24f2e05f4696c3f72ee6845` 检查两种芯片及实际包中的标题。Apple 芯片和 Intel 的源码测试、开发包构建与包内中文标题检查均通过。开发测试包不是桌面应用内的已公证 Safari 扩展，尚未验证 Safari 实际启用和网页剪藏。
+
 ## 不在通过范围内
 
 Finder 安装交互、窗口及菜单操作、物理 Mac、真实模型问答和引用、真实 Agent 调用、旧数据升级、Developer ID 签名、公证、Gatekeeper、Safari 扩展安装和实际使用均未完成验收。临时签名和 CI 单次启动不能证明正式分发或整个 macOS 产品可用。
