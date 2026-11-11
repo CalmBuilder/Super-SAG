@@ -154,6 +154,37 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
             record('folder expansion failure preserves collapsed state')
             context.close()
 
+            context = browser.new_context(viewport={'width': 1280, 'height': 800}, locale='zh-CN')
+            page = context.new_page()
+            page.on('pageerror', lambda error: errors.append(str(error)))
+            page.goto(origin + '/web/index.html', wait_until='networkidle')
+            page.evaluate('''() => {
+              localStorage.setItem('sag.sidebar.expanded', '{old invalid value');
+              localStorage.setItem('sag.search.history', '["old"]');
+              localStorage.setItem('sag.onboarding.seen', 'legacy');
+              localStorage.setItem('unrelated', 'keep');
+              localStorage.setItem('super-sag.web.v1.other', 'keep');
+            }''')
+            page.goto(origin + '/tests/bs/index.html?scenario=tree', wait_until='networkidle')
+            expect(page.locator('.brand')).to_have_text('Super-SAG')
+            page.get_by_role('button', name='展开示例知识库').click()
+            expect(page.get_by_role('button', name='展开一级')).to_be_visible()
+            assert page.evaluate("localStorage.getItem('sag.sidebar.expanded')") == '{old invalid value'
+            assert page.evaluate("localStorage.getItem('super-sag.web.v1.sag.sidebar.expanded')") is not None
+            page.get_by_role('button', name='设置', exact=True).click()
+            page.get_by_role('button', name='数据与隐私', exact=True).click()
+            page.get_by_role('button', name='清除所有数据', exact=True).click()
+            page.get_by_role('button', name='确认清除所有数据').click()
+            expect(page.get_by_role('dialog')).to_have_count(0)
+            assert page.evaluate("localStorage.getItem('sag.sidebar.expanded')") == '{old invalid value'
+            assert page.evaluate("localStorage.getItem('sag.search.history')") == '["old"]'
+            assert page.evaluate("localStorage.getItem('sag.onboarding.seen')") == 'legacy'
+            assert page.evaluate("localStorage.getItem('unrelated')") == 'keep'
+            assert page.evaluate("localStorage.getItem('super-sag.web.v1.other')") == 'keep'
+            assert page.evaluate("localStorage.getItem('super-sag.web.v1.sag.sidebar.expanded')") is None
+            record('old same-origin storage is ignored and preserved after simulated clear')
+            context.close()
+
             for width in (320, 375, 768, 959, 960):
                 context, page = new_page(width=width)
                 switcher = page.locator('.workspace-switch')

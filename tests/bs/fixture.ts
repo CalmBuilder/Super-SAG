@@ -1,6 +1,7 @@
 /** Isolated visual fixtures; this module is never imported by the product entry. */
 import type {EventCallback, EventName, Options, UnlistenFn} from '@tauri-apps/api/event';
 import {mountBrowser} from '../../src/bs/mount';
+import {BROWSER_STORAGE_NAMESPACE} from '../../src/bs/platform';
 import type {AppPlatform} from '../../src/lib/platform';
 import type {Root, Settings} from '../../src/lib/types';
 
@@ -73,6 +74,7 @@ const platform: AppPlatform = {
       case 'list_conversations':
       case 'list_notes':
       case 'list_drafts': result = []; break;
+      case 'clear_all_data': result = null; break;
       case 'get_docling_status': result = {installed: false, running: false, stage: '', message: '', downloaded: 0, total: null, error: null, formats: []}; break;
       default: throw new Error(`测试替身未实现：${command}`);
     }
@@ -81,7 +83,7 @@ const platform: AppPlatform = {
 };
 
 // Test server uses an isolated origin and browser profile; this does not touch desktop data.
-localStorage.setItem('sag.onboarding.seen', '1');
+localStorage.setItem(`${BROWSER_STORAGE_NAMESPACE}sag.onboarding.seen`, '1');
 Object.assign(window, {__BS_TEST__: {calls, scenario, pageErrors}});
 const target = document.getElementById('app');
 if (!target) throw new Error('Missing visual test container');
