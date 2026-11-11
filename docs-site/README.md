@@ -44,6 +44,6 @@ Update both languages and affected screenshots when product behavior changes. Se
 
 Dependencies, build outputs, generated sources, QA artifacts and TypeScript caches are local only. The site has no nested Git repository or separate Git remotes.
 
-当前仅提供本地预览，未部署。Super-SAG 尚无已发布的安装包；Windows 实机验收后继续同步截图。
+文档站当前仅提供本地预览，未部署。Windows 安装包已发布；业务验收后继续同步截图。
 
-This is a local preview, not a deployed site. No Super-SAG installer has been published; update screenshots after Windows acceptance.
+This documentation is a local preview, not a deployed site. A Windows installer is published; update screenshots after business acceptance.

@@ -4,7 +4,7 @@
 
 Super-SAG 面向个人和 Agent 提供本地知识库，包含文件夹管理、索引、搜索、问答、文件操作、设置与 CLI。
 
-**当前版本：`v0.1.0`。** 这是初始化候选版本，尚未正式发布；Windows 安装、业务及保留数据升级仍需实机验收。独立签名更新通道建立前，应用内自动更新暂不可用。
+**当前版本：`v0.1.0`。** [Windows 安装包已发布](https://github.com/CalmBuilder/Super-SAG/releases/tag/v0.1.0)；完整业务及保留数据升级仍需验收。macOS 个人版正在验证，尚未发布安装包。独立签名更新通道建立前，应用内自动更新暂不可用。
 
 ![使用虚构测试数据的桌面界面](docs-site/public/images/product-ask-home-cn.png)
 
@@ -27,7 +27,7 @@ npm.cmd run package:windows
 
 ## 项目顺序
 
-1. 完成并验收 Windows 桌面版，包括全新安装和从原版覆盖升级。
+1. 完成并验收 Windows 与 macOS 个人桌面版，包括全新安装、业务和保留数据升级。两者均不要求登录和选择租户。
 2. 以验收通过的 Windows 安装版为基准，先完成 Linux Web 样式与交互，再逐项接通业务。
 3. Web 对齐后增加用户、租户和授权。旧 Web 原型只复用权限设计和测试经验，旧代码与数据库不迁入。
 

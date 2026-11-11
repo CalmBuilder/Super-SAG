@@ -77,6 +77,16 @@ npm.cmd run package:windows
 
 安装器构建成功不代表 Windows 验收通过。须先在隔离环境核验全新安装与原版覆盖升级，记录安装包 SHA-256、数据和原件；不要覆盖唯一一份业务数据。当前未发布 Super-SAG 独立 npm 包或签名更新通道。
 
+macOS 原生构建入口：
+
+```sh
+npm ci
+npm run check
+npm run package:macos
+```
+
+该命令配置为生成 `.app`、`.dmg` 并检查应用内容；Apple 芯片和 Intel 的实际验证仍在进行。当前配置使用临时签名，不代表 Developer ID 签名、公证及对外分发已通过；如未提供经校验的 Safari 扩展安装包，桌面构建会禁用 Safari 扩展导出。
+
 ## 代码检查
 
 ```sh

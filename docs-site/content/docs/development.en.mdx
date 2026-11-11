@@ -77,6 +77,16 @@ Use Windows x64, Node.js 24.x (at least 24.15.0), Rust stable with the `x86_64-p
 
 A successful build is not Windows acceptance. Verify fresh installation and the original-app upgrade in an isolated environment first, recording the installer SHA-256, settings and original files. Do not overwrite the only copy of production data. A separate Super-SAG npm package and signed update channel have not been published.
 
+For a native macOS build:
+
+```sh
+npm ci
+npm run check
+npm run package:macos
+```
+
+The command is configured to build an `.app` and `.dmg` and inspect the app contents; verification on Apple silicon and Intel is in progress. The current configuration uses ad-hoc signing, which does not establish Developer ID signing, notarization or distribution readiness. If a verified Safari extension installer is not supplied, the desktop build disables Safari extension export.
+
 ## Code checks
 
 ```sh

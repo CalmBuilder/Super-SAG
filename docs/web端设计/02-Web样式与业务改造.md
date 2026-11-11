@@ -4,7 +4,7 @@
 
 ## 第一优先级：对齐 Windows 样式
 
-完成并实机验收 Windows 桌面版后，冻结其安装包、源码、环境和测试资料，作为 Web 正式对照基准；具体记录项见[Windows 基准](01-Windows品牌与升级.md#冻结正式-web-基准)。开发者本机只读参考中的 `App.svelte`、`src/components` 及用户的原 Windows 截图用于前期预研和辅助核对，不能代替已验收的 Super-SAG Windows 安装版。工作代码应优先抽取或复用同源 Svelte 组件、样式、翻译和交互状态，而不是另写一套管理卡片界面。Web 的身份和租户入口在后续阶段作为增量融入现有界面。
+完成 Windows 和 macOS 个人桌面版验收后，冻结 Windows 安装包、源码、环境和测试资料，作为 Web 正式对照基准；具体记录项见[Windows 基准](01-Windows品牌与升级.md#冻结正式-web-基准)。开发者本机只读参考中的 `App.svelte`、`src/components` 及用户的原 Windows 截图用于前期预研和辅助核对，不能代替已验收的 Super-SAG Windows 安装版。工作代码应优先抽取或复用同源 Svelte 组件、样式、翻译和交互状态，而不是另写一套管理卡片界面。Web 的身份和租户入口在后续阶段作为增量融入现有界面。
 
 视觉清单至少覆盖：
 

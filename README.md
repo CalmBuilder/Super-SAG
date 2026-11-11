@@ -4,7 +4,7 @@
 
 Super-SAG provides a local knowledge base for people and agents, with folder management, indexing, search, Q&A, file operations, settings and a CLI.
 
-**Current version: `v0.1.0`.** This initial candidate has not been released. Windows installation, business functions and data-preserving upgrade still require hands-on acceptance. Automatic updates remain disabled until an independent signing channel exists.
+**Current version: `v0.1.0`.** A [Windows installer is published](https://github.com/CalmBuilder/Super-SAG/releases/tag/v0.1.0); complete business workflows and data-preserving upgrade still require acceptance. The macOS personal edition is under verification and no macOS installer has been published. Automatic updates remain disabled until an independent signing channel exists.
 
 ![Desktop interface with synthetic test data](docs-site/public/images/product-ask-home-en.png)
 
@@ -27,7 +27,7 @@ The installer is expected under `src-tauri/target/release/bundle/nsis/`; use the
 
 ## Project order
 
-1. Finish and accept the Windows desktop app, including a clean installation and in-place upgrade from the original.
+1. Finish and accept the Windows and macOS personal desktop apps, including clean installation, business workflows and data-preserving upgrades. Neither requires login or tenant selection.
 2. Use that accepted Windows build as the baseline for Linux-hosted Web UI and behavior, then connect equivalent business functions.
 3. Add users, tenants and authorization after Web parity. Only permission design and testing experience are reused from the old Web prototype; its code and database are not migrated.
 
