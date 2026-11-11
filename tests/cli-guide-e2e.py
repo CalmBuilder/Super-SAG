@@ -13,6 +13,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import platform
 from pathlib import Path
 import subprocess
 import tempfile
@@ -247,7 +248,7 @@ def run(binary, windows_runner=False):
                     if directory.is_dir():
                         directory.rmdir()
 
-    return {"status": "passed", "platform": "Windows hosted runner" if windows else "Linux",
+    return {"status": "passed", "platform": "Windows hosted runner" if windows else platform.system(),
             "jev": "local protocol fixture, not real inference",
             "checks": checks, "synthetic_source_sha256": before, "fixture_http_requests": len(fixture.calls)}
 
