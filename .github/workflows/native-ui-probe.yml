@@ -12,6 +12,11 @@ jobs:
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '24.22.1'
+          cache: npm
+      - run: npm ci
       - name: Install browser automation client
         run: python -m pip install -r tests/browser/requirements.txt
       - name: Download the verified release installer
@@ -25,7 +30,10 @@ jobs:
         shell: pwsh
         env:
           SMOKE_DIRECTORY: ${{ steps.install.outputs.directory }}
-        run: ./tests/bs/native_ui_windows.ps1 -InstallDirectory "$env:SMOKE_DIRECTORY/installation"
+        run: |
+          ./tests/bs/native_ui_windows.ps1 -InstallDirectory "$env:SMOKE_DIRECTORY/installation"
+          python tests/bs/windows_visual_compare.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
