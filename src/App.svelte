@@ -37,7 +37,7 @@
  import type {FolderIndexOptions} from './lib/types';
  let folderIndexPath='';
  import {rememberScroll} from './lib/remember-scroll';
- import {appStorage} from './lib/storage';
+ import {appStorage,readStoredStringList} from './lib/storage';
  import Onboarding from './components/Onboarding.svelte';
  import ActionMenu from './components/ui/ActionMenu.svelte';import type{MenuState}from './components/ui/ActionMenu.svelte';
  import ToolCall from './components/ToolCall.svelte';
@@ -58,7 +58,7 @@
  import Tree from './components/Tree.svelte';import SettingsPanel from './components/Settings.svelte';import UpdateNotification from './components/UpdateNotification.svelte';import{api}from './lib/api';import{icon,logo}from './lib/icons';import{basename,dirname,normalizeScope,documentResults,escaped,fileName,inside,indexedSourcePath,isMarkdown,isRtf,isHtml,readonlyHtml,compactNumber,durationLabel}from './lib/domain';import type{Root,Entry,FileInfo,Document,Draft,Settings,Conversation,Candidate,Progress,QueryOutput,Message,McpCredentials,ToolApproval,ToolCallRecord}from './lib/types';
  let librarySessions:Record<string,LibrarySession>={'':createLibrarySession()};let libraryRevision=0;let exploreReturn='';let documentFromSearch=false,documentFromConversation=false,documentSearchScroll=0,documentConversationScroll=0,documentInitialMatch=0;let chatLog:HTMLDivElement;
  $:if(selected&&!librarySessions[selected])librarySessions={...librarySessions,[selected]:createLibrarySession()};
- let roots:Root[]=[],files:FileInfo[]=[],conversations:Conversation[]=[],settings:Settings|null=null,cache:Record<string,Entry[]>={},expanded=new Set<string>(JSON.parse(appStorage.getItem('sag.sidebar.expanded')??'[]'));
+ let roots:Root[]=[],files:FileInfo[]=[],conversations:Conversation[]=[],settings:Settings|null=null,cache:Record<string,Entry[]>={},expanded=new Set<string>(readStoredStringList('sag.sidebar.expanded'));
  let readOnlyDoc:Document|null=null;let searchTerms:string[]=[],documentSearchTerms:string[]=[];
  let previewReader:{doc:Document;Reader:typeof import('./components/MarkdownReader.svelte').default;model:import('./lib/document-model').MarkdownModel;target:number;terms:string[]}|null=null;
 let previewDocument:Document|null=null,previewInitialMatch=0,previewLoading=false,previewError='',previewRequest=0;
@@ -115,7 +115,7 @@ let previewDocument:Document|null=null,previewInitialMatch=0,previewLoading=fals
  // Treat a missing field as configured: older services omit `has_key`, and the backend still reports precise errors.
  $:answerReady=!settings||!settings.answer||(settings.answer.model??'').trim()!==''&&(settings.answer.auth_mode==='none'||settings.answer.has_key!==false);
  $:jevReady=!settings||!settings.jev||(settings.jev.model??'').trim()!==''&&(settings.jev.auth_mode==='none'||settings.jev.has_key!==false);
- async function loadWorkspace(){startupError='';settings=await api<Settings>('get_settings');setLanguage(settings.language??'zh-CN');if(settings.credential_error)notify(settings.credential_error);searchHistory=JSON.parse(appStorage.getItem('sag.search.history')??'[]');view=settings.start_page;await Promise.all([refresh(),history()]);startupError='';}
+ async function loadWorkspace(){startupError='';settings=await api<Settings>('get_settings');setLanguage(settings.language??'zh-CN');if(settings.credential_error)notify(settings.credential_error);searchHistory=readStoredStringList('sag.search.history');view=settings.start_page;await Promise.all([refresh(),history()]);startupError='';}
  async function retryStartup(){if(retrying)return;retrying=true;loading=true;try{await loadWorkspace();onboardingOpen=appStorage.getItem('sag.onboarding.seen')!=='1';}catch(e){startupError=String(e)}finally{retrying=false;loading=false}}
  function closeOnboarding(){appStorage.setItem('sag.onboarding.seen','1');onboardingOpen=false;}
  let historySearchOpen=false,historyRequest=0,folderPickerOpen=false,newDocumentFolder='';
