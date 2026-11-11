@@ -6,7 +6,7 @@ import time
 from urllib.parse import urlsplit
 from urllib.request import urlopen
 from playwright.sync_api import expect, sync_playwright
-from layout_probe import workspace_layout
+from layout_probe import exercise_sidebar_collapse, preference_layouts, workspace_layout
 
 port = int(os.environ['BS_NATIVE_DEBUG_PORT'])
 endpoint = f'http://127.0.0.1:{port}'
@@ -52,11 +52,14 @@ with sync_playwright() as playwright:
     page.screenshot(path=str(output / 'windows-files.png'), animations='disabled')
     page.get_by_role('button', name='问答', exact=True).click()
     expect(page.locator('.welcome h1')).to_have_text('向你的文件提问')
+    exercise_sidebar_collapse(page)
     page.get_by_role('button', name='设置', exact=True).click()
     expect(page.get_by_role('dialog')).to_be_visible()
     page.get_by_role('button', name='关闭设置').click()
     expect(page.get_by_role('dialog')).to_have_count(0)
+    layouts.update(preference_layouts(page, output, 'windows'))
     report = {'status':'passed', 'scope':'installed Windows app WebView navigation and settings',
-              'url':page.url, 'checks':['ask','search','files','settings open and close'], 'layout':layouts}
+              'url':page.url, 'checks':['ask','search','files','sidebar collapse and expand','settings open and close',
+                                       'dark theme and English setting'], 'layout':layouts}
     (output / 'result.json').write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     print(json.dumps(report, ensure_ascii=False))

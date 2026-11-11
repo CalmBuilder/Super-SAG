@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import {afterEach, describe, expect, it} from 'vitest';
-import {appStorage, setStorageNamespace} from '../src/lib/storage';
+import {appStorage, readStoredStringList, setStorageNamespace} from '../src/lib/storage';
 import {BROWSER_STORAGE_NAMESPACE} from '../src/bs/platform';
 
 afterEach(() => localStorage.clear());
@@ -39,5 +39,26 @@ describe('UI preference storage isolation', () => {
       restore();
     }
     expect(appStorage.getItem('sag.search.history')).toBe('["old"]');
+  });
+
+  it.each([['{broken'], ['null'], ['{}'], ['["valid", 7]']])(
+    'ignores an invalid saved list %s without changing its value', invalid => {
+      for (const namespace of ['', BROWSER_STORAGE_NAMESPACE]) {
+        const restore = setStorageNamespace(namespace);
+        try {
+          appStorage.setItem('sag.sidebar.expanded', invalid);
+          expect(readStoredStringList('sag.sidebar.expanded')).toEqual([]);
+          expect(appStorage.getItem('sag.sidebar.expanded')).toBe(invalid);
+        } finally {
+          restore();
+        }
+      }
+    },
+  );
+
+  it('reads valid lists unchanged and treats a missing list as empty', () => {
+    expect(readStoredStringList('sag.search.history')).toEqual([]);
+    appStorage.setItem('sag.search.history', '["文件", "query"]');
+    expect(readStoredStringList('sag.search.history')).toEqual(['文件', 'query']);
   });
 });

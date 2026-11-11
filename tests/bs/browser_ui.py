@@ -19,6 +19,7 @@ from urllib.error import URLError
 from urllib.request import urlopen
 
 from playwright.sync_api import expect, sync_playwright
+from layout_probe import exercise_sidebar_collapse
 
 ROOT = Path(__file__).resolve().parents[2]
 parser = argparse.ArgumentParser()
@@ -91,6 +92,9 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
             page.screenshot(path=str(output / f'{args.browser}-workspace.png'))
             record('desktop-sized navigation and shared workspace', width=1280)
 
+            exercise_sidebar_collapse(page)
+            record('desktop-sized sidebar collapse and expand')
+
             page.keyboard.press('Control+k')
             expect(page.locator('.search-page h1')).to_have_text('搜索你的文件')
             page.get_by_role('button', name='问答', exact=True).click()
@@ -152,6 +156,23 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
             expect(page.locator('#notice')).to_contain_text('测试读取目录失败')
             expect(root).to_have_attribute('aria-expanded', 'false')
             record('folder expansion failure preserves collapsed state')
+            context.close()
+
+            context = browser.new_context(viewport={'width': 1280, 'height': 800}, locale='zh-CN')
+            page = context.new_page()
+            page.on('pageerror', lambda error: errors.append(str(error)))
+            page.add_init_script('''
+              localStorage.setItem('super-sag.web.v1.sag.sidebar.expanded', '{bad');
+              localStorage.setItem('super-sag.web.v1.sag.search.history', '{}');
+            ''')
+            page.goto(origin + '/tests/bs/index.html?scenario=tree', wait_until='networkidle')
+            expect(page.locator('.welcome h1')).to_have_text('向你的文件提问')
+            assert page.evaluate("localStorage.getItem('super-sag.web.v1.sag.sidebar.expanded')") == '{bad'
+            assert page.evaluate("localStorage.getItem('super-sag.web.v1.sag.search.history')") == '{}'
+            page.get_by_role('button', name='搜索', exact=True).click()
+            expect(page.locator('.search-page h1')).to_have_text('搜索你的文件')
+            expect(page.locator('.search-history')).to_have_count(0)
+            record('malformed browser preferences do not block startup and remain unchanged')
             context.close()
 
             context = browser.new_context(viewport={'width': 1280, 'height': 800}, locale='zh-CN')
@@ -255,10 +276,12 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
             context = browser.new_context(viewport={'width': 1280, 'height': 800})
             page = context.new_page()
             page.on('pageerror', lambda error: errors.append(str(error)))
+            page.add_init_script("localStorage.setItem('sag.sidebar.expanded', '{old invalid value'); localStorage.setItem('sag.search.history', '{old invalid value');")
             page.goto(origin + '/web/index.html', wait_until='networkidle')
             expect(page.locator('.startup-error')).to_contain_text('Web 服务尚未接通')
             assert page.evaluate("typeof window.__BS_TEST__") == 'undefined'
             assert page.evaluate("typeof window.__TAURI_INTERNALS__") == 'undefined'
+            assert page.evaluate("localStorage.getItem('sag.sidebar.expanded')") == '{old invalid value'
             record('product entry rejects unavailable business without a fixture')
             context.close()
 
@@ -267,8 +290,9 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
             browser.close()
 
         source_names = [
-            'src/App.svelte', 'src/lib/platform.ts', 'src/bs/platform.ts', 'src/bs/sidebar.ts',
-            'src/bs/workspace.css', 'src/bs/mount.ts', 'tests/bs/fixture.ts', 'tests/bs/browser_ui.py',
+            'src/App.svelte', 'src/lib/platform.ts', 'src/lib/storage.ts', 'src/lib/remember-scroll.ts',
+            'src/bs/platform.ts', 'src/bs/sidebar.ts', 'src/bs/workspace.css', 'src/bs/mount.ts',
+            'tests/bs/fixture.ts', 'tests/bs/layout_probe.py', 'tests/bs/browser_ui.py',
         ]
         report = {
             'scope': 'shared UI with isolated synthetic fixture; not Windows desktop or real Web business acceptance',

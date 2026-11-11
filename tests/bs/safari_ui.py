@@ -19,6 +19,7 @@ from urllib.request import urlopen
 
 from selenium import webdriver
 from selenium.webdriver import ActionChains
+from selenium.common.exceptions import StaleElementReferenceException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC
@@ -69,6 +70,20 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
         def css(selector: str):
             return wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, selector)))
 
+        def clickable(selector: str):
+            def ready(current):
+                try:
+                    element = current.find_element(By.CSS_SELECTOR, selector)
+                    if not element.is_displayed() or not element.is_enabled():
+                        return False
+                    reachable = current.execute_script('''const e=arguments[0], r=e.getBoundingClientRect();
+                      const hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
+                      return !e.closest('[inert]') && !!hit && (e===hit || e.contains(hit));''', element)
+                    return element if reachable else False
+                except StaleElementReferenceException:
+                    return False
+            return wait.until(ready)
+
         def visit(scenario: str = 'normal', lang: str = 'zh-CN', theme: str = 'light') -> None:
             driver.get(f'{origin}/tests/bs/index.html?scenario={scenario}&lang={lang}&theme={theme}')
             css('.browser-client')
@@ -95,6 +110,18 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
         no_errors()
         record('desktop-sized navigation and shared workspace', width=1280)
 
+        initial_width = css('.sidebar').rect['width']
+        clickable('[aria-label="收起侧边栏"]').click()
+        wait.until(lambda current: 'compact-sidebar' in current.find_element(By.CSS_SELECTOR, '.real-client').get_attribute('class').split())
+        wait.until(lambda current: current.find_element(By.CSS_SELECTOR, '.sidebar').rect['width'] < initial_width - 30)
+        assert css('.sidebar').rect['width'] < initial_width
+        clickable('[aria-label="展开侧边栏"]').click()
+        wait.until(lambda current: 'compact-sidebar' not in current.find_element(By.CSS_SELECTOR, '.real-client').get_attribute('class').split())
+        wait.until(lambda current: abs(current.find_element(By.CSS_SELECTOR, '.sidebar').rect['width'] - initial_width) <= 1)
+        assert abs(css('.sidebar').rect['width'] - initial_width) <= 1
+        no_errors()
+        record('desktop-sized sidebar collapse and expand')
+
         ActionChains(driver).key_down(Keys.COMMAND).send_keys('k').key_up(Keys.COMMAND).perform()
         wait.until(EC.text_to_be_present_in_element((By.CSS_SELECTOR, '.search-page h1'), '搜索你的文件'))
         nav('问答')
@@ -106,13 +133,13 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
         wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, '[role="dialog"]')))
         css('[aria-label="关闭设置"]').click()
         wait.until(EC.invisibility_of_element_located((By.CSS_SELECTOR, '[role="dialog"]')))
-        css('[aria-label="切换明暗主题"]').click()
+        clickable('[aria-label="切换明暗主题"]').click()
         wait.until(lambda current: current.execute_script('return document.documentElement.dataset.theme') == 'dark')
         no_errors()
         record('settings open/close and theme change')
 
         visit(scenario='theme-error')
-        css('[aria-label="切换明暗主题"]').click()
+        clickable('[aria-label="切换明暗主题"]').click()
         wait.until(EC.text_to_be_present_in_element((By.CSS_SELECTOR, '#notice'), '测试保存主题失败'))
         assert driver.execute_script('return document.documentElement.dataset.theme') == 'light'
         no_errors()
@@ -153,6 +180,26 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
         assert css('[aria-label="展开示例知识库"]').get_attribute('aria-expanded') == 'false'
         no_errors()
         record('folder expansion failure preserves collapsed state')
+
+        driver.get(origin + '/web/index.html')
+        wait.until(EC.text_to_be_present_in_element((By.CSS_SELECTOR, '.startup-error'), 'Web 服务尚未接通'))
+        driver.execute_script('''
+          localStorage.setItem('super-sag.web.v1.sag.sidebar.expanded', '{bad');
+          localStorage.setItem('super-sag.web.v1.sag.search.history', '{}');
+        ''')
+        visit(scenario='tree')
+        wait.until(EC.text_to_be_present_in_element((By.CSS_SELECTOR, '.welcome h1'), '向你的文件提问'))
+        assert driver.execute_script("return localStorage.getItem('super-sag.web.v1.sag.sidebar.expanded')") == '{bad'
+        assert driver.execute_script("return localStorage.getItem('super-sag.web.v1.sag.search.history')") == '{}'
+        nav('搜索')
+        wait.until(EC.text_to_be_present_in_element((By.CSS_SELECTOR, '.search-page h1'), '搜索你的文件'))
+        assert not driver.find_elements(By.CSS_SELECTOR, '.search-history')
+        no_errors()
+        record('malformed browser preferences do not block startup and remain unchanged')
+        driver.execute_script('''
+          localStorage.removeItem('super-sag.web.v1.sag.sidebar.expanded');
+          localStorage.removeItem('super-sag.web.v1.sag.search.history');
+        ''')
 
         driver.get(origin + '/web/index.html')
         wait.until(EC.text_to_be_present_in_element((By.CSS_SELECTOR, '.startup-error'), 'Web 服务尚未接通'))
@@ -255,10 +302,12 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
         wait.until(EC.text_to_be_present_in_element((By.CSS_SELECTOR, '.startup-error'), 'Web 服务尚未接通'))
         assert driver.execute_script('return typeof window.__BS_TEST__') == 'undefined'
         assert driver.execute_script('return typeof window.__TAURI_INTERNALS__') == 'undefined'
+        assert driver.execute_script("return localStorage.getItem('sag.sidebar.expanded')") == '{old invalid value'
         record('product entry rejects unavailable business without a fixture')
 
-        source_names = ['src/App.svelte', 'src/lib/platform.ts', 'src/bs/platform.ts', 'src/bs/sidebar.ts',
-                        'src/bs/workspace.css', 'src/bs/mount.ts', 'tests/bs/fixture.ts', 'tests/bs/safari_ui.py']
+        source_names = ['src/App.svelte', 'src/lib/platform.ts', 'src/lib/storage.ts', 'src/lib/remember-scroll.ts',
+                        'src/bs/platform.ts', 'src/bs/sidebar.ts', 'src/bs/workspace.css', 'src/bs/mount.ts',
+                        'tests/bs/fixture.ts', 'tests/bs/safari_ui.py']
         report = {
             'scope': 'actual Safari with isolated synthetic fixture; not Windows desktop or real Web business acceptance',
             'browser': driver.capabilities.get('browserName'),
