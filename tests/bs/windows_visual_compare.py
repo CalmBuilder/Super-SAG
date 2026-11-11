@@ -20,7 +20,7 @@ from urllib.error import URLError
 from urllib.request import urlopen
 
 from playwright.sync_api import expect, sync_playwright
-from layout_probe import workspace_layout
+from layout_probe import compare_layout, preference_layouts, workspace_layout
 
 if sys.platform != 'win32' or os.environ.get('GITHUB_ACTIONS') != 'true' or os.environ.get('RUNNER_ENVIRONMENT') != 'github-hosted':
     raise SystemExit('Run only on a disposable GitHub-hosted Windows runner.')
@@ -65,11 +65,7 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
             page.goto(origin + '/tests/bs/index.html?scenario=desktop-baseline', wait_until='networkidle')
             def check_layout(view: str) -> dict[str, dict[str, float]]:
                 browser_layout = workspace_layout(page)
-                for selector, coordinates in native_report['layout'][view].items():
-                    for key, value in coordinates.items():
-                        actual = browser_layout[selector][key]
-                        if abs(actual - value) > 2:
-                            raise AssertionError(f'{view} {selector} {key}: desktop={value}, browser={actual}')
+                compare_layout(view, native_report['layout'][view], browser_layout)
                 return browser_layout
 
             expect(page.locator('.welcome h1')).to_have_text('向你的文件提问')
@@ -86,6 +82,10 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
             layouts['files'] = check_layout('files')
             page.evaluate('document.activeElement.blur()')
             page.screenshot(path=str(output / 'browser-files.png'), animations='disabled')
+            preference_views = preference_layouts(page, output, 'browser')
+            for view, coordinates_by_selector in preference_views.items():
+                compare_layout(view, native_report['layout'][view], coordinates_by_selector)
+            layouts.update(preference_views)
             assert not errors, errors
             report = {
                 'scope': 'same Windows runner and viewport; browser uses synthetic empty folder and matching display settings',
@@ -94,7 +94,9 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
                 'layout': layouts,
                 'sha256': {name: hashlib.sha256((output / name).read_bytes()).hexdigest()
                            for name in ('windows-ask.png', 'windows-search.png', 'windows-files.png',
-                                        'browser-ask.png', 'browser-search.png', 'browser-files.png')},
+                                        'browser-ask.png', 'browser-search.png', 'browser-files.png',
+                                        'windows-ask-dark.png', 'browser-ask-dark.png',
+                                        'windows-ask-en-dark.png', 'browser-ask-en-dark.png')},
             }
             (output / 'comparison.json').write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
             print(json.dumps(report, ensure_ascii=False))
