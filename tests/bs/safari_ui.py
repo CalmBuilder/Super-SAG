@@ -111,6 +111,13 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
         no_errors()
         record('settings open/close and theme change')
 
+        visit(scenario='theme-error')
+        css('[aria-label="切换明暗主题"]').click()
+        wait.until(EC.text_to_be_present_in_element((By.CSS_SELECTOR, '#notice'), '测试保存主题失败'))
+        assert driver.execute_script('return document.documentElement.dataset.theme') == 'light'
+        no_errors()
+        record('theme save failure retains prior theme')
+
         visit(lang='en', theme='dark')
         wait.until(lambda current: current.execute_script('return document.documentElement.lang') == 'en')
         assert driver.execute_script('return document.documentElement.dataset.theme') == 'dark'

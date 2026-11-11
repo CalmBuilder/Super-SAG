@@ -106,6 +106,13 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
             record('settings open/close and theme change')
             context.close()
 
+            context, page = new_page(scenario='theme-error')
+            page.get_by_role('button', name='切换明暗主题').click()
+            expect(page.locator('#notice')).to_contain_text('测试保存主题失败')
+            expect(page.locator('html')).to_have_attribute('data-theme', 'light')
+            record('theme save failure retains prior theme')
+            context.close()
+
             context, page = new_page(lang='en', theme='dark')
             expect(page.locator('.brand')).to_have_text('Super-SAG')
             expect(page.locator('html')).to_have_attribute('lang', 'en')
