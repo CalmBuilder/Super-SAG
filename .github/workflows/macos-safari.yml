@@ -25,6 +25,9 @@ jobs:
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: '24.22.1'
+      - run: npm ci
+      - name: Check Safari setup languages and states
+        run: npx vitest run tests/web-clipper-localization.test.js tests/web-clipper-safari-setup.test.js
       - name: Test Safari file storage and default paths
         shell: bash
         run: |
@@ -43,4 +46,11 @@ jobs:
           test -d "$app/Contents/PlugIns/Super-SAG Web Clipper Extension.appex"
           test -f browser-extension/build/sag-web-clipper-safari-development.dmg
           codesign --verify --deep --strict "$app"
+          python3 - "$app" <<'PY'
+          from pathlib import Path
+          import sys
+          scripts = list((Path(sys.argv[1]) / 'Contents/Resources').rglob('Script.js'))
+          assert len(scripts) == 1, f'Expected one Safari setup script, found {len(scripts)}'
+          assert 'Super-SAG 网页剪藏' in scripts[0].read_text(encoding='utf-8')
+          PY
           echo 'Development package and ad-hoc signature verified. Safari enablement and distribution are not covered.'

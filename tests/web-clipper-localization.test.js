@@ -23,6 +23,9 @@ it('keeps Safari setup states bilingual when switching languages',()=>{
  const language=dom.window.document.querySelector('#language');
  for(const [locale,expected] of [['zh-CN',['正在检查','待启用','已启用']],['en',['Checking','not enabled','enabled']]]) {
   language.value=locale;language.dispatchEvent(new dom.window.Event('change'));
+  const title=locale==='en'?'Super-SAG Web Clipper':'Super-SAG 网页剪藏';
+  expect(dom.window.document.title).toBe(title);
+  expect(dom.window.document.querySelector('h1').textContent).toBe(title);
   for(const [index,state] of [undefined,false,true].entries()) {
    dom.window.show(state);
    expect(dom.window.document.querySelector('#state').textContent).toContain(expected[index]);

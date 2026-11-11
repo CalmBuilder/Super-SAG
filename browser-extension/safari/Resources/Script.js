@@ -10,7 +10,7 @@ const translations = {
         failed: 'Unable to check the Safari extension status: ',
     },
     zh: {
-        title: 'SAG 网页剪藏', language: '语言', automatic: '跟随系统',
+        title: 'Super-SAG 网页剪藏', language: '语言', automatic: '跟随系统',
         unknown: '应用已安装，正在检查 Safari 扩展的启用状态…',
         on: '已安装 · 已启用。回到网页，右键选择“保存为 Markdown”即可使用。',
         off: '已安装 · 待启用。请在 Safari 设置 → 扩展中启用。',
