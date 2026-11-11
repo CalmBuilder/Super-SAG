@@ -133,8 +133,16 @@ with tempfile.TemporaryFile(mode='w+', encoding='utf-8') as log:
                 toggle.click()
                 wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, '.sidebar')))
                 assert driver.execute_script('return document.querySelector("main.workspace").inert') is True
+                wait.until(lambda current: current.execute_script('return document.activeElement === document.querySelector(\'.sidebar-titlebar [aria-label="收起侧边栏"]\')'))
                 css('.sidebar-titlebar [aria-label="收起侧边栏"]').click()
                 wait.until(EC.invisibility_of_element_located((By.CSS_SELECTOR, '.sidebar')))
+                wait.until(lambda current: current.execute_script('return document.activeElement === arguments[0]', toggle))
+                toggle.click()
+                css('.sidebar [aria-label="设置"]').click()
+                wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, '[role="dialog"]')))
+                css('[aria-label="关闭设置"]').click()
+                wait.until(EC.invisibility_of_element_located((By.CSS_SELECTOR, '[role="dialog"]')))
+                wait.until(lambda current: current.execute_script('return document.activeElement === arguments[0]', toggle))
             else:
                 assert not driver.find_elements(By.CSS_SELECTOR, '.browser-sidebar-toggle')
                 assert css('.sidebar').is_displayed()

@@ -98,8 +98,7 @@ let previewDocument:Document|null=null,previewInitialMatch=0,previewLoading=fals
  const closeBrowserSidebar=(restoreFocus=true)=>browserSidebar.close(restoreFocus);
  async function sidebarBrowse(path:string){try{await browse(path);closeMobileSidebar();closeBrowserSidebar()}catch(e){notify($t(String(e)))}}
  function openSidebarSettings(){
-  if(browserSidebarOpen){closeBrowserSidebar(false);void tick().then(()=>{settingsPage='general';settingsOpen=true});return}
-  if(mobileSidebarOpen){void closeSidebarForDialog().then(()=>{settingsPage='general';settingsOpen=true});return}
+  if(browserSidebarOpen||mobileSidebarOpen){void closeSidebarForDialog().then(()=>{settingsPage='general';settingsOpen=true});return}
   settingsPage='general';settingsOpen=true;
  }
  let composing=false,compositionEndedAt=-Infinity;

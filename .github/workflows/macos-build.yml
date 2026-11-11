@@ -49,6 +49,6 @@ jobs:
       - name: Build actual app and DMG and inspect app contents
         run: npm run package:macos
       - name: Install the DMG into an isolated directory and start the app
-        run: python3 scripts/smoke-macos.py --arch '${{ matrix.arch }}'
+        run: python3 scripts/smoke-macos.py --arch '${{ matrix.arch }}' --exercise-ui
       - name: Exercise the packaged CLI guide with real local files
         run: python3 tests/cli-guide-e2e.py --binary 'src-tauri/target/release/bundle/macos/Super-SAG.app/Contents/Resources/bin/sag'

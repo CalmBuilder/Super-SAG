@@ -2,8 +2,9 @@
 """Smoke-test a built macOS DMG on a disposable GitHub-hosted runner.
 
 This checks native process startup, its isolated service, and whether its
-window can be raised; it does not validate business interactions, distribution
-signing, notarization, or a user's machine.
+window can be raised. The optional UI probe exercises basic navigation; it does
+not validate business interactions, distribution signing, notarization, or a
+user's machine.
 """
 import argparse
 import hashlib
@@ -67,6 +68,7 @@ def verify_native_window(process, temporary):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--arch", choices=("arm64", "x86_64"), required=True)
+    parser.add_argument("--exercise-ui", action="store_true", help="Exercise basic native window navigation")
     args = parser.parse_args()
     require(sys.platform == "darwin" and os.environ.get("GITHUB_ACTIONS") == "true"
             and os.environ.get("RUNNER_ENVIRONMENT") == "github-hosted"
@@ -146,13 +148,20 @@ def main():
                 require(service["version"] == version and Path(service["data_directory"]).resolve() == data,
                         "Desktop connected to an unexpected service or data directory")
                 window = verify_native_window(process, temporary)
+                if args.exercise_ui:
+                    ui_probe = temporary / "native-ui-probe"
+                    run("swiftc", str(ROOT / "tests/bs/native_ui_macos.swift"), "-o", str(ui_probe), timeout=90)
+                    result = json.loads(run(str(ui_probe), str(process.pid), timeout=90).stdout)
+                    require(result.get("status") == "passed", "Native interface probe did not pass")
+                    window["interface_navigation"] = result
 
             print(json.dumps({"status": "passed", "runner": platform.platform(), "architecture": args.arch,
                               "version": version, "dmg_sha256": digest, "installed_from_dmg": True,
                               "signature": "local ad-hoc signature integrity only",
                               "spctl_assessment": assessment,
                               "native_window": window,
-                              "scope": "DMG copy, native app process, isolated service and native window raise",
+                              "scope": "DMG copy, native app process, isolated service and native window" +
+                                       (" navigation" if args.exercise_ui else " raise"),
                               "not_verified": ["window business interactions", "real model", "physical Mac", "Developer ID", "notarization"]}, indent=2))
         finally:
             if process is not None and process.poll() is None:
