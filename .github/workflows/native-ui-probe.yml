@@ -25,7 +25,7 @@ jobs:
         shell: pwsh
         env:
           SMOKE_DIRECTORY: ${{ steps.install.outputs.directory }}
-        run: ./tests/bs/native_probe_windows.ps1 -InstallDirectory "$env:SMOKE_DIRECTORY/installation"
+        run: ./tests/bs/native_ui_windows.ps1 -InstallDirectory "$env:SMOKE_DIRECTORY/installation"
   macos:
     runs-on: macos-15
     timeout-minutes: 15
