@@ -12,7 +12,7 @@ Super-SAG 的 B/S 部署以一台主机为服务端：`super-sag` 后台服务�
 已经安装桌面端时，可在 **设置 → 远程服务** 开启网页服务。无桌面服务器直接使用 CLI，最小启动流程如下：
 
 ```sh
-export SAG_DATA_DIR=/var/lib/super-sag       # 可选，指定主机数据目录
+export SAG_DATA_DIR="$HOME/.local/share/super-sag" # 可选，指定主机数据目录
 super-sag add /srv/super-sag-library         # 首次部署时加入并索引目录
 super-sag api web access-code on              # 建议保留访问码
 super-sag api web start --host 0.0.0.0 --port 24681
@@ -21,7 +21,7 @@ super-sag api status
 
 `api status` 输出的本机或局域网地址才是浏览器地址；`0.0.0.0` 只是监听地址，不能直接粘贴到浏览器。访问码用 `super-sag api web code` 查看。单独运行 `super-sag api start` 只开启 HTTP API/MCP，不会代替 `api web start` 开启浏览器页面；停止网页使用 `super-sag api web stop`，停止整个后台服务使用 `super-sag service stop`。
 
-从源码部署时，在仓库根目录运行 `npm ci && npm run build:cli`，然后将 `src-tauri/bin/sag` 作为 `super-sag` 执行。构建过程会把 `dist-web` 资源嵌入 CLI，因此不需要另行运行 Node/Vite 服务器。若需主机开机自动恢复后台和已保存的网页服务，网页启动后运行 `super-sag api autostart enable`。
+从源码部署时，在仓库根目录运行 `npm ci && npm run build:cli`，再运行 `./src-tauri/bin/sag install cli` 安装当前用户的 CLI，打开新终端后使用上面的 `super-sag` 命令。构建过程会把 `dist-web` 资源嵌入 CLI，因此不需要另行运行 Node/Vite 服务器。若需主机开机自动恢复后台和已保存的网页服务，网页启动后运行 `super-sag api autostart enable`。若必须使用 `/var/lib` 等系统目录，请先让当前服务用户拥有该目录。
 
 1. 使用桌面端时，打开 **设置 → 远程服务**，开启 **网页服务**。
 2. 在本机点击地址旁的打开按钮，或在同一局域网的其他设备上打开显示的局域网地址。

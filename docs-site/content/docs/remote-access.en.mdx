@@ -12,7 +12,7 @@ Super-SAG uses a single host for its browser/server deployment: the `super-sag` 
 With the desktop app installed, enable **Settings → Remote services → Web service**. On a headless server, use this minimal CLI flow:
 
 ```sh
-export SAG_DATA_DIR=/var/lib/super-sag       # optional host data directory
+export SAG_DATA_DIR="$HOME/.local/share/super-sag" # optional host data directory
 super-sag add /srv/super-sag-library         # add and index the first library
 super-sag api web access-code on              # recommended
 super-sag api web start --host 0.0.0.0 --port 24681
@@ -21,7 +21,7 @@ super-sag api status
 
 Use the local or LAN address printed by `api status` as the browser URL; `0.0.0.0` is only a bind address and must not be pasted into a browser. View the access code with `super-sag api web code`. Running `super-sag api start` by itself enables HTTP API/MCP but does not replace `api web start` or serve the browser page. Stop the Web service with `super-sag api web stop`, or stop the whole background service with `super-sag service stop`.
 
-For a source deployment, run `npm ci && npm run build:cli` in the repository root and use `src-tauri/bin/sag` in place of `super-sag`. The build embeds `dist-web`, so no separate Node/Vite production server is needed. After enabling the Web service, run `super-sag api autostart enable` if the host should restore the background service and saved Web service after reboot.
+For a source deployment, run `npm ci && npm run build:cli` in the repository root, then run `./src-tauri/bin/sag install cli` to install the CLI for the current user and open a new terminal before using the `super-sag` commands above. The build embeds `dist-web`, so no separate Node/Vite production server is needed. After enabling the Web service, run `super-sag api autostart enable` if the host should restore the background service and saved Web service after reboot. If you use a system directory such as `/var/lib`, make sure it is writable by the service user first.
 
 1. In the desktop app, open **Settings → Remote services** and enable **Web service**.
 2. Click the open button next to the local address, or open the displayed LAN address on another device on the same network.
