@@ -5,6 +5,24 @@ description: "在本机或局域网的浏览器中使用 Super-SAG。"
 
 ## 网页服务
 
+### 部署边界
+
+Super-SAG 的 B/S 部署以一台主机为服务端：`super-sag` 后台服务负责知识库、索引、配置和模型请求，CLI 内置的 Web 资源负责返回浏览器页面。没有单独的 Web 前端进程、Node/Vite 生产服务器或独立数据库部署步骤；桌面端只是可选的本机控制界面。服务端主机和后台进程必须持续运行，浏览器可来自本机或局域网设备。
+
+已经安装桌面端时，可在 **设置 → 远程服务** 开启网页服务。无桌面服务器直接使用 CLI，最小启动流程如下：
+
+```sh
+export SAG_DATA_DIR=/var/lib/super-sag       # 可选，指定主机数据目录
+super-sag add /srv/super-sag-library         # 首次部署时加入并索引目录
+super-sag api web access-code on              # 建议保留访问码
+super-sag api web start --host 0.0.0.0 --port 24681
+super-sag api status
+```
+
+`api status` 输出的本机或局域网地址才是浏览器地址；`0.0.0.0` 只是监听地址，不能直接粘贴到浏览器。访问码用 `super-sag api web code` 查看。单独运行 `super-sag api start` 只开启 HTTP API/MCP，不会代替 `api web start` 开启浏览器页面；停止网页使用 `super-sag api web stop`，停止整个后台服务使用 `super-sag service stop`。
+
+从源码部署时，在仓库根目录运行 `npm ci && npm run build:cli`，然后将 `src-tauri/bin/sag` 作为 `super-sag` 执行。构建过程会把 `dist-web` 资源嵌入 CLI，因此不需要另行运行 Node/Vite 服务器。若需主机开机自动恢复后台和已保存的网页服务，网页启动后运行 `super-sag api autostart enable`。
+
 1. 使用桌面端时，打开 **设置 → 远程服务**，开启 **网页服务**。
 2. 在本机点击地址旁的打开按钮，或在同一局域网的其他设备上打开显示的局域网地址。
 3. 网页访问码开启时，点击 **复制访问码**，将访问码粘贴到浏览器登录页。同一浏览器再次打开同一地址时会自动连接，点击 **退出** 可清除记住的访问码。关闭访问码时会直接进入知识库。
