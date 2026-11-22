@@ -1,0 +1,1006 @@
+<script lang="ts">
+ import {updateSettingsForLanguage} from './lib/updates';
+ import ShareDialog from "./components/ShareDialog.svelte";
+ let shareDialog:{path:string;code:string;directory?:string}|null=null;let lastShareCode="",checkingShareClipboard=false;
+ async function checkShareClipboard(){if(web||loading||settingsOpen||shareDialog||checkingShareClipboard)return;checkingShareClipboard=true;try{const code=await api<string|null>("share_clipboard");if(code&&code!==lastShareCode){lastShareCode=code;shareDialog={path:"",code}}}catch(e){console.error(e)}finally{checkingShareClipboard=false}}
+ async function sharedReceived(path:string){await api("add_root",{path});await refresh();await libraryBrowse(path)}
+ import {isLargeMarkdown} from './lib/large-document-policy';
+ import {beginDocumentTrace,cancelDocumentTrace,afterDocumentPaint,type DocumentTrace} from './lib/document-performance';
+ import {displayPath,sourceName,sourceFolder,citedNumbers,isHelpDocument} from './lib/domain';
+ import {t,setLanguage,language,languageOptions,translate} from './lib/i18n';
+ import {externalLinkClick} from './lib/external-links';
+ import {applyTheme,watchSystemTheme} from './lib/theme';
+ import DesktopWindowControls from './components/DesktopWindowControls.svelte';
+ import LibraryWorkspace from './components/LibraryWorkspace.svelte';
+ import WelcomeMark from './components/WelcomeMark.svelte';
+ import {createWelcomeMotionPicker} from './lib/motion';
+ const chooseWelcomeMotion=createWelcomeMotionPicker();
+ import IndexDetails from './components/IndexDetails.svelte';
+ import IndexStatusCard from './components/IndexStatusCard.svelte';
+ import DoclingDownload from './components/DoclingDownload.svelte';
+ import DocumentQuestion from './components/DocumentQuestion.svelte';
+ import SaveNoteDialog from './components/SaveNoteDialog.svelte';
+ import NoteStatus from './components/NoteStatus.svelte';
+ import type {NoteDetail,NoteSourceStatus,NoteSummary} from './lib/types';
+ import {isNote} from './lib/domain';
+ let saveNoteFor:{index:number}|null=null;let noteDetail:NoteDetail|null=null,noteChecking=false,noteRequest=0;let noteSummaries:NoteSummary[]=[];
+ import type {IndexStatus,IndexProgress,IndexFailure} from './lib/types';
+ import SearchSummary from './components/SearchSummary.svelte';
+ import SearchResultItem from './components/SearchResultItem.svelte';
+ import SearchPassagePicker from './components/SearchPassagePicker.svelte';
+ import {quietScroll} from './lib/quiet-scroll';
+ import {createLibrarySession} from './lib/explore';
+ import type {LibrarySession} from './lib/explore';
+ import Input from "./components/ui/Input.svelte";
+ import Textarea from "./components/ui/Textarea.svelte";
+ import Select from "./components/ui/Select.svelte";
+ import{Button,Pagination,Popover}from 'bits-ui';
+ import type {SearchPagination} from './lib/types';
+ import{onMount,tick}from 'svelte';import{listen}from './lib/app-events';
+ import{web,requestId,copyText}from './lib/web-connection';
+ export let onWebSignOut: (()=>void)|undefined=undefined;
+ import Modal from './components/ui/Modal.svelte';
+ import HistorySearch from './components/HistorySearch.svelte';
+ import ToolGroup from './components/ToolGroup.svelte';
+ import Timestamp from './components/Timestamp.svelte';
+ import FolderPicker from './components/FolderPicker.svelte';
+ import FolderIndexSettings from './components/FolderIndexSettings.svelte';
+ import type {FolderIndexOptions} from './lib/types';
+ let folderIndexPath='';
+ import {rememberScroll} from './lib/remember-scroll';
+ import Onboarding from './components/Onboarding.svelte';
+ import QuickSetup from './components/QuickSetup.svelte';
+ import ActionMenu from './components/ui/ActionMenu.svelte';import type{MenuState}from './components/ui/ActionMenu.svelte';
+ import ToolCall from './components/ToolCall.svelte';
+ import CitationDocument from './components/CitationDocument.svelte';
+ import Reasoning from './components/Reasoning.svelte';
+ import AnswerProcess from './components/AnswerProcess.svelte';
+ import ReasoningControl from './components/ReasoningControl.svelte';
+ import ContextUsage from './components/ContextUsage.svelte';
+ import type {ReasoningEffort} from './lib/reasoning';
+ import {followChat} from './lib/chat-scroll';
+ import {answerHtml} from './lib/answer-html';
+ import {answerEvents} from './lib/answer-events';
+ import {shortcutLabel,type QuickSearchConfiguration} from './lib/quick-search';
+ import {subscribeDataChanges} from './lib/data-changes';
+ import {indexTaskKey,stableRows} from './lib/stable-snapshot';
+ import HighlightedDocument from './components/HighlightedDocument.svelte';import HtmlDocument from './components/HtmlDocument.svelte';import{highlightedText,searchSnippet,searchText,documentMatchIndex}from './lib/search-highlights';import{legacyPreview}from './lib/preview-mode';
+ import Tree from './components/Tree.svelte';import SettingsPanel from './components/Settings.svelte';import UpdateNotification from './components/UpdateNotification.svelte';import{api}from './lib/api';import{icon,logo}from './lib/icons';import{basename,dirname,normalizeScope,documentResults,escaped,fileName,inside,indexedSourcePath,isMarkdown,isRtf,isHtml,readonlyHtml,compactNumber,durationLabel}from './lib/domain';import type{Root,Entry,FileInfo,Document,Draft,Settings,Conversation,Candidate,Progress,QueryOutput,SearchSummaryResult,Message,McpCredentials,ToolApproval,ToolCallRecord}from './lib/types';
+ let librarySessions:Record<string,LibrarySession>={'':createLibrarySession()};let libraryRevision=0;let exploreReturn='';let documentFromSearch=false,documentFromConversation=false,documentSearchScroll=0,documentConversationScroll=0,documentInitialMatch=0;let chatLog:HTMLDivElement;
+ $:if(selected&&!librarySessions[selected])librarySessions={...librarySessions,[selected]:createLibrarySession()};
+ let roots:Root[]=[],files:FileInfo[]=[],conversations:Conversation[]=[],settings:Settings|null=null,cache:Record<string,Entry[]>={},expanded=new Set<string>(JSON.parse(localStorage.getItem('sag.sidebar.expanded')??'[]'));
+ let documentReadRequest=0;let documentTrace:DocumentTrace|undefined;
+ let loadingDocument=0,documentReadSession=0,largeCandidate:Candidate|null=null,restoreDocumentScroll=false;
+ let LargeReader:typeof import('./components/LargeDocumentReader.svelte').default;
+ let previewTrace:DocumentTrace|undefined,suspendedPreview:Candidate|null=null;
+ function nextDocumentReadRequest(){loadingDocument=0;cancelDocumentTrace();return ++documentReadRequest;}
+ let readOnlyDoc:Document|null=null;let searchTerms:string[]=[],documentSearchTerms:string[]=[];
+ let previewReader:{doc:Document;Reader:typeof import('./components/MarkdownReader.svelte').default;model:import('./lib/document-model').MarkdownModel;target:number;terms:string[]}|null=null;
+let previewDocument:Document|null=null,previewInitialMatch=0,previewLoading=false,previewError='',previewRequest=0;
+ let view='ask',selected='',readingFolder='',collapsed=false,conversation:Conversation|null=null,ask='',search='',searched=false,results:Candidate[]=[],focus:Candidate|null=null,preview='',source:Candidate|null=null;
+ let helpMode=false,helpQuestion=-1;
+ const isAssistantConversation=(conversation:Conversation)=>conversation.messages.some(message=>message.help===true);
+ $: visibleConversations=conversations.filter(conversation=>isAssistantConversation(conversation)===helpMode);
+ const helpQuestions=['怎么添加文件夹？','怎么配置模型？','怎么在浏览器里访问？'];
+ $:helpSuggestion=helpMode&&!conversation&&!pending?$t(helpQuestions[helpQuestion]):'';
+ let sidebarMotion=false,sidebarAnimations:Animation[]=[];
+ let viewportWidth=window.innerWidth,mobileSidebarOpen=false;
+ let sidebarToggle:HTMLElement|null=null,mobileSidebarToggle:HTMLElement|null=null;
+ $: narrowLayout=viewportWidth<=680;
+ $: if(!narrowLayout)mobileSidebarOpen=false;
+ async function toggleMobileSidebar(open:boolean){
+  mobileSidebarOpen=open;
+  await tick();
+  (open?sidebarToggle:mobileSidebarToggle)?.focus();
+ }
+ let composing=false,compositionEndedAt=-Infinity;
+ let references:string[]=[],mention=false,mentionTerm='',mentionIndex=0,mentionStart=0,mentionEnd=0,askInput:HTMLTextAreaElement;
+ let composer:HTMLFormElement,workspaceContent:HTMLDivElement,mentionSide:'top'|'bottom'='top';
+ let searchMode:'search'|'deep_search'=(localStorage.getItem('sag.search.mode') as 'search'|'deep_search'|null)??'deep_search';let searchModeChosen=localStorage.getItem('sag.search.mode')!==null;
+ $:if(settings&&!searchModeChosen&&!jevReady)searchMode='search';
+ let searchHistory:string[]=[],searchInput:HTMLInputElement;
+ let searchPagination:SearchPagination|null=null,searchPage=1,searchQuestion='',paging=false,searchList:HTMLDivElement;
+ let summaryJob='',summaryText='',summaryError='',summaryBusy=false,summaryEvidence:Candidate[]=[];
+ let summaryContext:SearchSummaryResult['context']|null=null;
+ let searchStopped=false,searchRanked=false,searchElapsed:number|null=null,searchJobKind:'search'|'deep_search'='deep_search',searchError='';
+ let pendingHistoryLength=0,chatScrollKey=0;
+ let askJob='',cancellingAsk='',searchJob='',askStage='',searchStage='',askBusy=false,searchBusy=false;
+ let activeToolId='',pending:Message|null=null,toast='',undo:(()=>Promise<void>)|null=null;
+ $:busy=view==='search'?searchBusy:askBusy||!!cancellingAsk;
+ $:stage=view==='search'?searchStage:askStage;
+ let noticeTimer:ReturnType<typeof setTimeout>;
+ let draft:Draft|null=null,dirty=false,EditorComponent:any=null,draftTimer:ReturnType<typeof setTimeout>;
+ let quitPending=false;
+ let indexDetailsOpen=false,indexPaused=false;
+ let failedIndexFiles=0,rebuildingFailedIndexes=false,failedIndexRetryError='';
+ let failedIndexDocuments:IndexFailure[]=[],retryDocuments:IndexFailure[]=[],retryCycleActive=false;
+ let recentIndexedFiles:string[]=[],workspaceSnapshotLoaded=false;
+ let indexTasks:IndexStatus['tasks']=[];
+ let conversionStates:NonNullable<IndexStatus['conversion_states']>=[];
+ let indexProgress:IndexProgress|null=null;
+ let dismissedIndexResult:string|null=null,activeIndexCardHidden=false;
+ $:indexResultSignature=JSON.stringify([roots.map(({path,status,count,error})=>({path,status,count,error})),failedIndexDocuments,failedIndexFiles]);
+ $:if(indexing||indexPaused||retryCycleActive||rebuildingFailedIndexes)dismissedIndexResult=null;
+ $:if(!indexing&&!indexPaused&&!retryCycleActive&&!rebuildingFailedIndexes)activeIndexCardHidden=false;
+ $:indexing=indexTasks.length>0||roots.some(r=>r.status!=='ready'&&r.status!=='error'&&r.status!=='partial');
+ $:indexParserCandidates=indexTasks.filter(task=>!!indexProgress&&(!indexProgress.stage||task.stage===indexProgress.stage)&&(indexProgress.id?indexTaskKey(task)===indexProgress.id:task.path===indexProgress.path&&(!indexProgress.kind||task.kind===indexProgress.kind)));
+ $:indexParserTask=indexParserCandidates.length===1?indexParserCandidates[0]:undefined;
+ // First-run onboarding must not depend on service startup completing.
+ let onboardingOpen=!web&&localStorage.getItem('sag.onboarding.seen')!=='1';
+ let quickSetupOpen=false;
+ let startupError='',retrying=false;
+ // Treat a missing field as configured: older services omit `has_key`, and the backend still reports precise errors.
+ $:answerReady=!settings||!settings.answer||(settings.answer.model??'').trim()!==''&&(settings.answer.auth_mode==='none'||settings.answer.has_key!==false);
+ $:jevReady=!settings||!settings.jev||(settings.jev.model??'').trim()!==''&&(settings.jev.auth_mode==='none'||settings.jev.has_key!==false);
+ async function loadWorkspace(){startupError='';settings=await api<Settings>('get_settings');setLanguage(settings.language);if(settings.credential_error)notify(settings.credential_error);searchHistory=JSON.parse(localStorage.getItem('sag.search.history')??'[]');view=web?'files':settings.start_page;await Promise.all([refresh(),history(),web?api<string>('web_library').then(path=>webLibrary=path):undefined]);if(web&&roots.length)await browse(roots[0].path,true);startupError='';}
+ async function retryStartup(){if(retrying)return;retrying=true;loading=true;try{await loadWorkspace();}catch(e){startupError=String(e)}finally{retrying=false;loading=false}}
+ function closeOnboarding(){localStorage.setItem('sag.onboarding.seen','1');onboardingOpen=false;}
+ function openQuickSetup(){quickSetupOpen=true;}
+ let historySearchOpen=false,historyRequest=0,folderPickerOpen=false,folderPickerTab='folders',folderPickerDirectory='',newDocumentFolder='';
+ let webLibrary='',creatingWebFolder=false;
+ let chooseSaveFolder:((folder:string|null)=>void)|null=null;
+ let saveFolderExpanded=new Set<string>(),saveFolderError='',saveNameNeeded=false;
+ let saving=false;
+ $:if(chooseSaveFolder&&!newDocumentFolder&&roots.length)newDocumentFolder=roots[0].path;
+ let settingsOpen=false,settingsPage='general',scopeOpen=false,scope:string[]=[],scopeDraft:string[]=[],scopeExpanded=new Set<string>();
+ let quickSearchConfiguration:QuickSearchConfiguration|null=null;
+ let quickSearchHintDismissed=localStorage.getItem('sag.quick-search-hint.dismissed')==='1';
+ $:if(!web&&view==='search'&&!searched&&!settingsOpen&&!quickSearchHintDismissed)void api<QuickSearchConfiguration>('get_quick_search').then(value=>quickSearchConfiguration=value).catch(e=>notify($t(String(e))));
+ let menu:MenuState|null=null;let toolApproval:ToolApproval|null=null;
+ let removeFolderPath='',removingFolder=false,removeFolderError='';
+ let renderedAnswers:Record<string,ReturnType<typeof import('./lib/markdown').renderAnswer>>={};
+ let answerRenderer:typeof import('./lib/markdown').renderAnswer|undefined;
+ let answerRendererLoading:Promise<void>|undefined;
+ let renameId='',renameTitle='',renameError='',renaming=false,leave:((value:boolean)=>void)|null=null,loading=true,error='';
+ let editingMessage:number|null=null,editingText='',retryIndex:number|null=null,messageInput:HTMLTextAreaElement;
+ const mac=/Mac/i.test(navigator.userAgent);
+ $:scopeLabel=scope.length===0?$t("全部文件"):scope.length===1?basename(scope[0]):$t("{value0} 个文件夹",{value0:scope.length});
+ $:currentEntries=cache[selected]||[];
+ $:directoryEntries=selected?currentEntries:roots.map(root=>({path:root.path,name:root.name,directory:true,symlink:false}));
+ $:indexedPaths=new Set(files.flatMap(file=>[file.path,indexedSourcePath(file.path,file.source_path)]));
+ $:indexedCache=Object.fromEntries(Object.entries(cache).map(([path,entries])=>[path,entries.filter(entry=>entry.directory?!entry.name.startsWith('.'):indexedPaths.has(entry.path))]));
+ $:if(view!=='document'&&readOnlyDoc)readOnlyDoc=null;
+ $:if(!previewDocument&&previewReader)previewReader=null;
+ // Keep only the candidate and versioned scroll anchor while a large preview is offscreen.
+ $:if((view!=='search'||!focus)&&previewDocument&&isLargeMarkdown(previewDocument)){
+  suspendedPreview=focus;previewDocument=null;previewTrace?.cancel();
+ }
+ $:if(view==='search'&&focus&&focus===suspendedPreview&&!previewDocument&&!previewLoading)void focusResult(focus,true,true);
+ $:fileView=view==='files'||view==='document'||view==='editor';
+ $:welcomeMotionEnabled=!web&&!onboardingOpen&&!settingsOpen&&!scopeOpen&&!quickSetupOpen&&!historySearchOpen&&!mobileSidebarOpen;
+ let slideWorkspaceTab=false;
+ $:libraryParent=roots.some(root=>root.path===selected)?'':dirname(selected);
+ $:shownMessages=pending?conversation?.messages.slice(0,pendingHistoryLength)||[]:conversation?.messages||[];
+ $:displayedMessages=[...shownMessages,...(pending?[pending]:[])];
+ $:answerHasError=view==='ask'&&displayedMessages.some(message=>message.error&&$t(message.error)===$t(error));
+ $:if(displayedMessages.length)void renderAnswers(displayedMessages);
+ function answerKey(message:Message){return JSON.stringify([message.question,message.answer,message.tool_calls?.map(call=>[call.id,call.answer_offset]),message.reasoning_blocks?.map(block=>[block.answer_offset,block.tool_count]),message.evidence.map(({id,path,hash})=>[id,path,hash])]);}
+ function loadAnswerRenderer(){return answerRendererLoading??=import('./lib/markdown').then(module=>{answerRenderer=module.renderAnswer;renderAnswers(displayedMessages)});}
+ function renderAnswers(messages:Message[]){if(!answerRenderer){void loadAnswerRenderer();return;}const next:typeof renderedAnswers={};for(const message of messages){const key=answerKey(message);next[key]=renderedAnswers[key]??renderAnswerSafely(message);}renderedAnswers=next;}
+ // A renderer failure on one answer must not blank every answer: show that answer as plain text.
+ function renderAnswerSafely(message:Message):ReturnType<NonNullable<typeof answerRenderer>>{try{return answerRenderer!(message.answer,message.evidence,message.tool_calls,message.reasoning_blocks)}catch(error){console.error(error);const plain=(text:string)=>escaped(text).replace(/\n/g,'<br>');const events=answerEvents(message.tool_calls,message.reasoning_blocks).map(event=>({...event,html:plain(message.answer.slice(event.from,event.offset))}));return {html:plain(message.answer.slice(events.at(-1)?.offset??0)),events,sources:[]};}}
+ $:rankedGroups=documentResults(results);
+ $:groups=searchRanked?rankedGroups.slice((searchPage-1)*20,searchPage*20):rankedGroups;
+ $:searchStageText=stage==='SAG2 正在分析'?$t("正在准备搜索"):stage==='正在检索原文'?$t("正在查找相关文件"):stage==='正在扩展检索'?$t("正在扩展搜索范围"):stage==='Jev 正在判断相关原文'?$t("正在按相关性排序"):$t(stage);
+ $:mentions=files.filter(f=>!references.includes(f.path)&&(f.name.toLowerCase().includes(mentionTerm.toLowerCase())||f.path.toLowerCase().includes(mentionTerm.toLowerCase()))).slice(0,20);
+ $:if(settings){applyTheme(settings.theme);document.documentElement.style.setProperty('--editor-font-size',`${settings.editor_size}px`)}
+ onMount(watchSystemTheme);
+ async function answerApproval(allow:boolean){if(!toolApproval)return;const id=toolApproval.id;toolApproval=null;try{await api('resolve_tool_approval',{id,allow})}catch(e){notify($t(String(e)))}}
+ function clearConversationState(){historyRequest++;closeNotice();conversations=[];historySearchOpen=false;conversation=null;pending=null;renderedAnswers={};ask='';references=[];source=null;helpMode=false;editingMessage=null;retryIndex=null;askJob='';cancellingAsk='';askBusy=false;askStage='';activeToolId='';error='';toolApproval=null;localStorage.removeItem('sag.history.scroll');localStorage.removeItem('sag.assistant.history.scroll');}
+ function closeNotice(){clearTimeout(noticeTimer);toast='';undo=null;}
+ function clearFoldersState(){nextDocumentReadRequest();refreshGeneration++;refreshPending=false;roots=[];files=[];scope=[];references=[];expanded=new Set();scopeExpanded=new Set();cache={};selected='';indexProgress=null;indexTasks=[];conversionStates=[];failedIndexFiles=0;failedIndexRetryError='';failedIndexDocuments=[];retryDocuments=[];retryCycleActive=false;recentIndexedFiles=[];workspaceSnapshotLoaded=false;if(view==='files')view='ask';}
+ function scheduleNotice(){clearTimeout(noticeTimer);if(!toast||document.hidden||document.querySelector('#notice:hover, #notice:focus-within'))return;noticeTimer=setTimeout(closeNotice,undo?8000:3000);}
+ function notify(message:string,action:(()=>Promise<void>)|null=null){toast=message;undo=action;scheduleNotice();}
+ let refreshGeneration=0,refreshPending=false,refreshRunning:Promise<void>|null=null,appDisposed=false;
+ function refresh():Promise<void>{
+  if(appDisposed)return Promise.resolve();
+  refreshGeneration++;refreshPending=true;
+  if(!refreshRunning)refreshRunning=refreshSnapshots().finally(()=>{refreshRunning=null;if(refreshPending&&!appDisposed)return refresh();});
+  return refreshRunning;
+ }
+ function applyIndexStatus(status:IndexStatus){
+  failedIndexFiles=status.failed_files??0;failedIndexDocuments=stableRows(failedIndexDocuments,status.failed_documents??[],file=>`${file.root}:${file.path}`);
+  const wasActive=indexTasks.length>0;indexTasks=stableRows(indexTasks,status.tasks??[],indexTaskKey);indexPaused=status.paused;conversionStates=stableRows(conversionStates,status.conversion_states??[],state=>state.source);
+  if(!wasActive&&indexTasks.length)recentIndexedFiles=[];
+  if(indexTasks.length){const task=indexTasks.find(task=>task.kind!=='enhancement')??indexTasks[0];indexProgress={id:indexTaskKey(task),kind:task.kind,path:task.path,count:task.completed,total:task.total,stage:task.stage,summary:task.summary};}
+  else if(wasActive)indexProgress=null;
+ }
+ function reconcileRetryCycle(status:IndexStatus,nextRoots:Root[]){
+  if(retryCycleActive&&!rebuildingFailedIndexes&&!status.tasks?.length&&!nextRoots.some(root=>root.status==='pending'||root.status==='indexing')){retryCycleActive=false;retryDocuments=[];}
+ }
+ function pollIndexStatus(){let disposed=false,timer:ReturnType<typeof setTimeout>;
+  const poll=async()=>{try{if(!loading&&!refreshRunning&&(indexing||indexPaused||retryCycleActive)){
+   const generation=refreshGeneration;
+   const [status,nextRoots]=await Promise.all([api<IndexStatus>('get_index_status'),api<Root[]>('list_roots')]);
+   if(disposed||generation!==refreshGeneration)return;const wasRetrying=retryCycleActive;reconcileRetryCycle(status,nextRoots);const finished=(indexTasks.length>0&&!status.tasks?.length)||(wasRetrying&&!retryCycleActive);applyIndexStatus(status);roots=stableRows(roots,nextRoots,root=>root.path);
+   if(finished)void refresh().catch(error=>notify($t(String(error))));
+  }}catch{/* Events and the next snapshot recover a transient polling failure. */}finally{if(!disposed)timer=setTimeout(poll,1000)}};
+  timer=setTimeout(poll,1000);return()=>{disposed=true;clearTimeout(timer)};
+ }
+ function indexPauseChanged(paused:boolean){if(indexPaused===paused)return;indexPaused=paused;void refresh().catch(e=>notify($t(String(e))));}
+ async function toggleIndexPause(){
+  try{applyIndexStatus(await api<IndexStatus>('set_index_paused',{paused:!indexPaused}));await refresh()}
+  catch(error){notify($t(String(error)))}
+ }
+ async function rebuildFailedIndexes(){
+  if(rebuildingFailedIndexes||indexing||indexPaused||!failedIndexFiles)return;
+  rebuildingFailedIndexes=true;retryCycleActive=true;retryDocuments=[...failedIndexDocuments];failedIndexRetryError='';indexProgress=null;
+  try{
+   roots=await api<Root[]>('retry_failed_indexes');
+   void refresh().catch(e=>notify($t(String(e))));
+  }catch(e){retryCycleActive=false;failedIndexRetryError=$t(String(e));}
+  finally{rebuildingFailedIndexes=false;}
+ }
+ async function refreshSnapshots(){
+  while(refreshPending&&!appDisposed){
+   refreshPending=false;const generation=refreshGeneration;
+   try{
+    const paths=[...new Set([...expanded,...scopeExpanded,selected].filter(Boolean))];
+    const [nextRoots,nextStatus,nextFiles,removed,nextNotes]=await Promise.all([
+     api<Root[]>('list_roots'),api<IndexStatus>('get_index_status'),api<FileInfo[]>('list_files'),api<string[]>('list_removed_directories'),api<NoteSummary[]>('list_notes',{scope:null}).catch(()=>[] as NoteSummary[])
+    ]);
+    noteSummaries=nextNotes;if(draft&&!draft.is_new&&noteDetail&&noteDetail.summary.path===draft.path)void loadNote(draft.path);
+    if(appDisposed||generation!==refreshGeneration)continue;
+    const included=(path:string)=>!removed.some(directory=>inside(path,directory));
+    const entries=await Promise.all(paths.filter(path=>included(path)&&nextRoots.some(root=>inside(path,root.path))).map(async path=>[path,await api<Entry[]>('list_entries',{path})] as const));
+    if(appDisposed||generation!==refreshGeneration)continue;
+    if(workspaceSnapshotLoaded&&(indexing||nextStatus.tasks?.length)){
+     const previous=new Set(files.map(file=>file.source_path??file.path));
+     const added=nextFiles.filter(file=>!previous.has(file.source_path??file.path)).map(file=>file.source_path??file.path);
+     if(added.length)recentIndexedFiles=[...new Set([...added,...recentIndexedFiles])].slice(0,5);
+    }
+    workspaceSnapshotLoaded=true;
+    reconcileRetryCycle(nextStatus,nextRoots);
+    const stableRoots=stableRows(roots,nextRoots,root=>root.path),stableFiles=stableRows(files,nextFiles,file=>file.id);
+    if(stableRoots!==roots)roots=stableRoots;
+    if(stableFiles!==files)files=stableFiles;
+    applyIndexStatus(nextStatus);
+    if(indexProgress&&!nextStatus.tasks.some(task=>task.path===indexProgress?.path)&&!nextRoots.some(root=>root.path===indexProgress?.path&&root.status==='indexing'))indexProgress=null;
+    expanded=new Set([...expanded].filter(path=>included(path)&&nextRoots.some(root=>inside(path,root.path))));scopeExpanded=new Set([...scopeExpanded].filter(included));
+    scope=scope.filter(included);references=references.filter(included);
+    const nextCache=Object.fromEntries(Object.entries(cache).filter(([path])=>included(path)));
+    let cacheChanged=Object.keys(nextCache).length!==Object.keys(cache).length;
+    for(const [path,rows] of entries){const stable=stableRows(cache[path]??[],rows,entry=>entry.path);if(stable!==cache[path]){nextCache[path]=stable;cacheChanged=true;}}
+    if(cacheChanged)cache=nextCache;
+    if(selected&&!included(selected)&&!draft)selected=nextRoots.find(root=>inside(selected,root.path))?.path||'';
+    libraryRevision++;
+   }catch(error){if(appDisposed)return;if(!refreshPending)throw error;}
+  }
+ }
+
+ async function history(){
+  const request=++historyRequest;
+  const next=await api<Conversation[]>('list_conversations');
+  if(appDisposed||request!==historyRequest)return;
+  conversations=next;
+  if(conversation)conversation=next.find(c=>c.id===conversation!.id)||(askBusy?conversation:null);
+ }
+ async function protect():Promise<boolean>{if(!draft||!dirty)return true;return new Promise(resolve=>leave=resolve)}
+ async function acceptQuickSearch(){
+  if(!settings)return;
+  const request=await api<{query:string;candidate:Candidate|null;deep:boolean}|null>('take_quick_search_request');
+  if(!request||!await protect())return;
+  settingsOpen=false;scopeOpen=false;historySearchOpen=false;indexDetailsOpen=false;
+  if(localStorage.getItem('sag.onboarding.seen')==='1')onboardingOpen=false;
+  await resetSearch(false);draft=null;readOnlyDoc=null;view='search';search=request.query;searchMode=request.deep?'deep_search':'search';
+  if(request.candidate){
+   searched=true;searchQuestion=request.query;results=[request.candidate];activeResult=0;searchRanked=request.deep;
+   await tick();await focusResult(request.candidate);
+  }else if(request.query){await tick();await run(request.deep?'deep_search':'search');}
+  else{await tick();searchInput?.focus();}
+ }
+ onMount(()=>{
+  let disposed=false,stop=()=>{};
+  void listen('quick-search-open',()=>{void acceptQuickSearch().catch(e=>notify($t(String(e))))}).then(unlisten=>{if(disposed)unlisten();else stop=unlisten;}).catch(e=>notify($t(String(e))));
+  return()=>{disposed=true;stop();};
+ });
+ async function requestQuit(){if(quitPending||leave)return;quitPending=true;try{if(draft&&dirty)await api('reveal_main_window');if(await protect())await api('quit_application')}catch(e){notify($t(String(e)))}finally{quitPending=false}}
+ async function leaveChoice(choice:'save'|'discard'|'cancel'){if(choice==='save'&&!await save())return;if(choice==='discard'&&draft){clearTimeout(draftTimer);await api('delete_draft',{path:draft.path});dirty=false;draft=null}const done=leave;leave=null;done?.(choice!=='cancel')}
+ async function navigate(next:string,pointer=false){
+  if(!await protect())return;
+  slideWorkspaceTab=pointer&&!web&&next!==view;
+  nextDocumentReadRequest();view=next;menu=null;if(next!=='editor')draft=null;
+  await tick();
+  if(next==='ask')askInput?.focus({preventScroll:true});
+  if(next==='search')searchInput?.focus({preventScroll:true});
+ }
+ type AnswerEvent=ReturnType<typeof answerEvents>[number];
+ // Consecutive tool calls with no answer text between them read as one research step.
+ const joinsToolRun=(m:Message,events:AnswerEvent[],i:number)=>i>0&&events[i].kind==='tool'&&events[i-1].kind==='tool'&&!m.answer.slice(events[i].from,events[i].offset).trim();
+ function toolRun(m:Message,events:AnswerEvent[],i:number){const run=[i];while(run.at(-1)!+1<events.length&&joinsToolRun(m,events,run.at(-1)!+1))run.push(run.at(-1)!+1);return run}
+ const toolState=(m:Message,call:ToolCallRecord,current:Message|null,active:string,working:boolean)=>call.error&&!call.is_error&&m.status==='stopped'?'stopped':m===current&&active===call.id?(m.error?'failed':working?'running':'stopped'):'complete';
+ // Converted sources are stored as <name>.md next to the original; show the original name.
+ const citationName=sourceName;
+ async function toggleSidebar(event:MouseEvent){
+  if(narrowLayout){await toggleMobileSidebar(false);return;}
+  const animate=event.detail>0&&!matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const controls=[...(event.currentTarget as HTMLElement).closest('aside')!.querySelectorAll<HTMLElement>('.brand-mark,.sidebar-titlebar>.icon-button,.nav-item,.sidebar-tools>button')];
+  const before=animate?controls.map(node=>node.getBoundingClientRect()):[];
+  sidebarAnimations.forEach(animation=>animation.cancel());sidebarAnimations=[];
+  sidebarMotion=animate;collapsed=!collapsed;
+  await tick();
+  if(!animate)return;
+  controls.forEach((node,index)=>{
+   const after=node.getBoundingClientRect();
+   sidebarAnimations.push(node.animate([
+    {transform:`translate(${before[index].left-after.left}px,${before[index].top-after.top}px)`},
+    {transform:'translate(0,0)'}
+   ],{duration:220,easing:'cubic-bezier(.32,.72,0,1)'}));
+  });
+ }
+ async function browse(path:string,directory=false){
+  const entry=files.find(f=>f.path===path)||Object.values(cache).flat().find(e=>e.path===path&&!e.directory);
+  if(!directory&&(entry||isMarkdown(path))){await edit(path,[],'',undefined,'library');return;}
+  if(!await protect())return;nextDocumentReadRequest();exploreReturn='';selected=path;view='files';draft=null;menu=null;readingFolder=path;
+  try{cache={...cache,[path]:await api<Entry[]>('list_entries',{path})}}finally{if(readingFolder===path)readingFolder=''}
+ }
+ async function toggle(path:string,isScope=false){let set=new Set(isScope?scopeExpanded:expanded);if(set.has(path))set.delete(path);else{set.add(path);cache={...cache,[path]:await api<Entry[]>('list_entries',{path})}}if(isScope)scopeExpanded=set;else{expanded=set;localStorage.setItem('sag.sidebar.expanded',JSON.stringify([...set]));}}
+ async function add(){
+  if(web){
+   if(!await libraryBrowse(''))return;
+   if(mobileSidebarOpen)await toggleMobileSidebar(false);
+   creatingWebFolder=true;
+   return;
+  }
+  folderPickerTab='folders';folderPickerDirectory='';folderPickerOpen=true;
+ }
+ async function openCreatedFolder(path:string){
+  try{await refresh();await browse(path,true)}catch(error){notify($t(String(error)))}
+ }
+ async function openImportedFolder(path:string){
+  try{
+   if(!await protect())return;
+   await refresh();
+   const root=roots.find(root=>inside(path,root.path));
+   if(root){
+    const next=new Set(expanded);
+    for(let parent=dirname(path);parent&&inside(parent,root.path);parent=dirname(parent))next.add(parent);
+    expanded=next;
+    localStorage.setItem('sag.sidebar.expanded',JSON.stringify([...expanded]));
+    await refresh();
+   }
+   await browse(path,true);
+   settingsOpen=false;
+   folderPickerOpen=false;
+  }catch(error){notify($t(String(error)))}
+ }
+ async function addFolders(paths:string[],options?:FolderIndexOptions){
+  const failures:{path:string;error:string}[]=[];
+  if(!indexTasks.length)indexProgress=null;
+  for(const path of paths){try{await api<string>(options?'add_root_with_options':'add_root',options?{path,options}:{path})}catch(e){failures.push({path,error:$t(String(e))})}}
+  if(failures.length<paths.length){await refresh();notify($t('已添加 {value0} 个文件夹，正在后台建立索引，大文件夹可能耗时数分钟',{value0:paths.length-failures.length}))}
+  return failures;
+ }
+ async function edit(path:string,terms:string[]=[],origin='',citation?:Candidate,navigation:'context'|'library'='context'){
+  const request=nextDocumentReadRequest();
+  const trace=beginDocumentTrace(isMarkdown(path)?'editor':'readonly');
+  if(!await protect()||request!==documentReadRequest){trace.cancel();return;}
+  loadingDocument=request;
+  const previousView=view,previousSelected=selected,previousBody=draft?.body,previousName=draft?.name;
+  const current=()=>!appDisposed&&request===documentReadRequest&&view===previousView&&selected===previousSelected&&draft?.body===previousBody&&draft?.name===previousName;
+  const fromSearch=navigation==='context'&&view==='search',fromConversation=navigation==='context'&&view==='ask',target=citation??(fromSearch&&focus?.path===path?focus:null),scroll=fromSearch?(searchList?.scrollTop??0):0,chatScroll=fromConversation?(chatLog?.scrollTop??0):0;
+  try{
+   const readDone=trace.stage('read-rpc');
+   let doc:Document;try{doc=await api<Document>('read_document',{path});}finally{readDone();}
+   if(!current()){trace.cancel();return;}
+   const large=isLargeMarkdown(doc);
+   trace.setRenderer(large?'reader':isMarkdown(doc.path)?'editor':'readonly');
+   const targetDone=trace.stage('target');
+   let initialMatch:number;try{initialMatch=target&&!large?await documentMatchIndex(doc.body,doc.path,terms,target):0;}finally{targetDone();}
+   const componentDone=trace.stage('component');
+   let editor:typeof import('./components/RichEditor.svelte').default|null;try{if(large){LargeReader=(await import('./components/LargeDocumentReader.svelte')).default;editor=null;}else editor=isMarkdown(doc.path)?(await import('./components/RichEditor.svelte')).default:null;}finally{componentDone();}
+   if(!current()){trace.cancel();return;}
+   documentTrace=trace;
+   documentInitialMatch=initialMatch;documentFromSearch=fromSearch;documentFromConversation=fromConversation;documentSearchScroll=scroll;documentConversationScroll=chatScroll;exploreReturn=origin;documentSearchTerms=terms;menu=null;
+   if(!editor){
+    largeCandidate=large?target:null;restoreDocumentScroll=!largeCandidate;documentReadSession=request;readOnlyDoc=doc;draft=null;dirty=false;selected=dirname(doc.source_path??path);view='document';source=null;
+    noteDetail=null;if(large&&isNote(doc.body))void loadNote(doc.path);else noteRequest++;
+    if(!large&&trace.enabled){await tick();void afterDocumentPaint(trace,()=>!appDisposed&&request===documentReadRequest&&readOnlyDoc===doc);}return;}
+   draft={...doc,is_new:false};dirty=false;selected=dirname(doc.source_path??path);EditorComponent=editor;view='editor';source=null;
+   noteDetail=null;if(isNote(doc.body))void loadNote(doc.path);else noteRequest++;
+  }catch(e){trace.cancel();if(current())notify($t(String(e)))}
+  finally{if(request===documentReadRequest)loadingDocument=0;}
+ }
+ async function editLargeDocument(){
+  const doc=readOnlyDoc;if(!doc)return;
+  const request=nextDocumentReadRequest(),trace=beginDocumentTrace('editor');
+  loadingDocument=request;
+  try{
+   const done=trace.stage('component');
+   let editor:typeof import('./components/RichEditor.svelte').default;
+   try{editor=(await import('./components/RichEditor.svelte')).default;}finally{done();}
+   if(request!==documentReadRequest||view!=='document'||readOnlyDoc!==doc){trace.cancel();return;}
+   const targetDone=trace.stage('target');
+   let initial:number;
+   try{initial=largeCandidate&&documentSearchTerms.length?await documentMatchIndex(doc.body,doc.path,documentSearchTerms,largeCandidate):0;}finally{targetDone();}
+   if(request!==documentReadRequest||view!=='document'||readOnlyDoc!==doc){trace.cancel();return;}
+   documentInitialMatch=initial;documentTrace=trace;EditorComponent=editor;
+   draft={...doc,is_new:false};dirty=false;view='editor';readOnlyDoc=null;
+  }catch(e){trace.cancel();if(request===documentReadRequest)notify($t(String(e)));}
+  finally{if(request===documentReadRequest)loadingDocument=0;}
+ }
+ async function loadNote(path:string){
+  const request=++noteRequest;
+  try{const detail=await api<NoteDetail>('get_note',{path});if(request===noteRequest)noteDetail=detail;}
+  catch{if(request===noteRequest)noteDetail=null;}
+ }
+ async function recheckNote(){
+  if(!noteDetail||noteChecking)return;noteChecking=true;
+  try{await api<NoteSummary[]>('verify_notes',{paths:[noteDetail.summary.path]});await loadNote(noteDetail.summary.path);}
+  catch(e){notify($t(String(e)))}finally{noteChecking=false}
+ }
+ async function openNoteSource(status:NoteSourceStatus){
+  const span=status.current??{start_byte:status.source.start_byte,end_byte:status.source.end_byte,start_line:status.source.start_line,start_column:1,end_line:status.source.end_line,end_column:1};
+  const content=status.current_text??status.source.text;
+  const candidate:Candidate={id:0,document_id:0,path:status.source.path,title:basename(status.source.path),heading:'',content,start_line:span.start_line,end_line:span.end_line,source_ranges:[[span.start_byte,span.end_byte]],source_spans:[span],bm25:0,score:0,order:0,hash:status.current_hash??status.source.hash};
+  source=candidate;
+ }
+ async function reaskNote(){
+  if(!noteDetail||!await protect())return;
+  const detail=noteDetail;
+  await stop('ask');editingMessage=null;conversation=null;pending=null;draft=null;readOnlyDoc=null;noteDetail=null;
+  ask=detail.summary.question;scope=normalizeScope(detail.summary.scope??[]);references=[];view='ask';
+  await tick();askInput?.focus({preventScroll:true});
+ }
+ async function openNote(path:string){await edit(path);}
+ function noteSaved(conversationId:string,index:number,note:NoteDetail){
+  const path=note.summary.path;
+  if(conversation?.id===conversationId)conversation={...conversation,messages:conversation.messages.map((m,i)=>i===index?{...m,note_path:path}:m)};
+  void history();notify($t('已保存笔记《{value0}》',{value0:note.summary.title}),async()=>{closeNotice();await openNote(path)});
+ }
+ async function saveNote(index:number,forcePanel=false){
+  const folder=settings?.notes?.folder?.trim();
+  if(forcePanel||!folder||settings?.notes?.ask_location){saveNoteFor={index};return;}
+  if(!conversation)return;
+  const conversationId=conversation.id;
+  try{noteSaved(conversationId,index,await api<NoteDetail>('save_note',{conversationId,messageIndex:index,target:folder,fileName:null,expectedHash:null,remember:false}));}
+  catch(e){notify($t(String(e)))}
+ }
+ async function returnToFiles(){
+  if(documentFromConversation){
+   if(!await protect())return;documentFromConversation=false;view='ask';draft=null;readOnlyDoc=null;
+   await tick();await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));
+   chatLog.scrollTop=documentConversationScroll;chatLog.dispatchEvent(new Event('scroll'));
+  }else if(documentFromSearch){
+   if(!await protect())return;documentFromSearch=false;restorePreview=true;view='search';draft=null;readOnlyDoc=null;
+   await tick();if(searchList)searchList.scrollTop=documentSearchScroll;
+  }else if(exploreReturn){if(!await protect())return;selected=exploreReturn;exploreReturn='';view='files';draft=null;readOnlyDoc=null;}else await libraryBrowse(selected)
+ }
+ async function libraryBrowse(path:string){if(!path){if(!await protect())return false;nextDocumentReadRequest();selected='';view='files';draft=null;readOnlyDoc=null;exploreReturn='';documentFromSearch=false;documentFromConversation=false;return true;}const entry=currentEntries.find(e=>e.path===path);if(entry?.symlink){try{await api('reveal_path',{path})}catch(e){notify($t(String(e)))}}else try{await browse(path,entry?.directory)}catch(e){notify($t(String(e)))}}
+ async function create(folder=selected){
+  if(!await protect())return;
+  const request=nextDocumentReadRequest();const editor=(await import('./components/RichEditor.svelte')).default;
+  if(request!==documentReadRequest||appDisposed)return;EditorComponent=editor;
+  selected=folder;documentFromConversation=false;documentFromSearch=false;documentSearchTerms=[];
+  draft={path:(folder?folder+'/':'')+'.draft-'+requestId(),name:$t("未命名.md"),body:'',hash:'',is_new:true};dirty=false;view='editor';
+ }
+ function draftFolder(value:Draft){return value.is_new&&value.path.startsWith('.draft-')?'':dirname(value.path)}
+ function finishSaveFolder(folder:string|null){
+  if(folder){try{fileName(draft!.name)}catch(e){saveNameNeeded=true;saveFolderError=$t(String(e));return;}}
+  const resolve=chooseSaveFolder!;chooseSaveFolder=null;resolve(folder);
+ }
+ async function toggleSaveFolder(path:string){
+  saveFolderError='';
+  if(saveFolderExpanded.has(path)){saveFolderExpanded=new Set([...saveFolderExpanded].filter(item=>item!==path));return;}
+  try{cache={...cache,[path]:await api<Entry[]>('list_entries',{path})};saveFolderExpanded=new Set([...saveFolderExpanded,path]);}
+  catch(e){saveFolderError=$t(String(e));}
+ }
+ function changed(body:string){if(!draft)return;draft={...draft,body};dirty=true;clearTimeout(draftTimer);draftTimer=setTimeout(()=>{if(draft)api('put_draft',{draft}).catch(e=>notify($t('草稿保存失败：{value0}',{value0:$t(String(e))})))},500)}
+ async function save(){
+  if(!draft||saving)return false;
+  saving=true;
+  try{
+   let folder=draftFolder(draft);
+   const draftName=draft.name.trim();
+   const needsName=!draftName||languageOptions.some(({value})=>draftName===translate('未命名.md',value));
+   if(draft.is_new&&(!folder||needsName)){
+    newDocumentFolder=folder||roots[0]?.path||'';
+    saveFolderExpanded=new Set();saveFolderError='';saveNameNeeded=needsName;
+    folder=await new Promise<string|null>(resolve=>chooseSaveFolder=resolve)??'';
+    if(!folder)return false;
+   }
+   const old=draft.path;const name=fileName(draft.name);const path=draft.is_new?folder+'/'+name:draft.path;const doc=await api<Document>('save_document',{path,body:draft.body,expectedHash:draft.is_new?null:draft.hash});clearTimeout(draftTimer);await api('delete_draft',{path:old});draft={path:doc.path,source_path:doc.source_path,name:doc.name,body:doc.body,hash:doc.hash,is_new:false};selected=dirname(doc.path);dirty=false;await refresh();notify($t("文件已保存，索引正在更新"));return true;
+  }catch(e){notify($t(String(e)));return false}finally{saving=false}
+ }
+ function scopeShow(){scopeDraft=[...scope];scopeExpanded=new Set(expanded);scopeOpen=true;menu=null}
+ function scopeCheck(path:string){scopeDraft=scopeDraft.some(p=>inside(path,p))?scopeDraft.filter(p=>!inside(path,p)&&!inside(p,path)):normalizeScope([...scopeDraft,path]);}
+ async function applyScope(){await stop();scope=normalizeScope(scopeDraft);scopeOpen=false;searched=false;results=[];summaryText='';summaryError='';summaryEvidence=[];summaryContext=null;}
+ function showBlankFileMenu(event:MouseEvent){
+  const items=[
+   {label:$t('新建文档'),glyph:'plus',run:()=>{void create()}},
+   ...(!selected?[{label:$t('导入数据'),glyph:'folder-up',run:()=>{folderPickerTab='imports';folderPickerDirectory='';folderPickerOpen=true}}]:[]),
+   {label:$t('接收分享'),glyph:'download',run:()=>{shareDialog={path:'',code:'',directory:selected}}}
+  ];
+  menu={x:Math.max(8,Math.min(event.clientX,innerWidth-240)),y:Math.max(8,Math.min(event.clientY,innerHeight-(selected?94:130))),trigger:event.currentTarget as HTMLElement,items};
+ }
+ function showMenu(e:MouseEvent,path:string,isRoot:boolean,file:boolean){
+  const items:{label:string;glyph:string;run:()=>void}[]=[
+   {label:$t("问答"),glyph:'chat',run:()=>folderQuery(path,'ask',file)},
+   {label:$t("搜索"),glyph:'search',run:()=>folderQuery(path,'search',file)}
+  ];
+  if(!web&&(!file||path.toLowerCase().endsWith(".md")))items.push({label:$t("分享"),glyph:"externalLink",run:()=>{menu=null;shareDialog={path,code:""}}});
+  if(!file)items.push({label:$t("索引设置"),glyph:'settings',run:()=>folderIndexPath=path});
+  if(!web&&(!file||indexedPaths.has(path)))items.push({label:$t(isRoot?"移除":"从知识库移除"),glyph:'close',run:()=>{if(file)void remove(path,true).catch(e=>notify($t(String(e))));else{removeFolderError='';removeFolderPath=path;}}});
+  if(!web&&file)items.push({label:$t("打开原文件"),glyph:'externalLink',run:()=>api('open_source_file',{path}).catch(e=>notify($t(String(e))))});
+  if(!web)items.push({label:mac?$t("在 Finder 中打开"):$t("在文件资源管理器中打开"),glyph:'folder',run:()=>api('reveal_path',{path}).catch(e=>notify($t(String(e))))});
+  const trigger=(e.target as Element).closest<HTMLElement>('button')||(e.currentTarget as HTMLElement).querySelector<HTMLElement>('button')!;const rect=trigger.getBoundingClientRect();menu={x:Math.min(e.clientX||rect.left,innerWidth-240),y:Math.min((e.clientY||rect.bottom)+8,innerHeight-items.length*38-12),trigger,items};
+ }
+ async function folderQuery(path:string,next:string,file=false){if(!await protect())return false;nextDocumentReadRequest();await stop(next==='ask'?'ask':'search');if(next==='ask'){helpMode=false;editingMessage=null;conversation=null;pending=null;ask='';references=file?[path]:[];draft=null;error='';}scope=[path];searched=false;view=next;menu=null;await tick();if(next==='ask')askInput?.focus();else searchInput?.focus();return true;}
+ async function askDocument(question:string){
+  let path=(draft??readOnlyDoc)!.path;
+  if(draft?.is_new){if(!await save())return;path=draft!.path;}
+  try{
+   if(!await folderQuery(path,'ask',true))return;
+   readOnlyDoc=null;source=null;retryIndex=null;mention=false;documentFromSearch=false;documentFromConversation=false;
+   ask=question;await run('ask');
+  }catch(e){notify($t(String(e)));}
+ }
+ async function remove(path:string,file=false){if(!await protect())return;nextDocumentReadRequest();await stop();await api('remove_root',{path});scope=scope.filter(p=>!inside(p,path));references=references.filter(p=>!inside(p,path));expanded=new Set([...expanded].filter(p=>!inside(p,path)));cache=Object.fromEntries(Object.entries(cache).filter(([p])=>!inside(p,path)));if(inside(selected,path)){selected='';view='files';draft=null}if(file&&(draft?.path===path||readOnlyDoc?.path===path)){draft=null;readOnlyDoc=null;view='files'}await refresh();notify($t(file?"已从知识库移除文件，原文件保留":"已移除文件夹，原文件保留"),async()=>{await api('add_root',{path});await refresh();notify($t(file?"已恢复文件":"已恢复文件夹"))});}
+ async function confirmRemoveFolder(){removingFolder=true;removeFolderError='';try{await remove(removeFolderPath);removeFolderPath='';}catch(e){removeFolderError=$t(String(e));}finally{removingFolder=false;}}
+ async function deleteConversation(c:Conversation){
+  try{
+   await api('edit_conversation',{id:c.id,title:null,deleted:true});
+   if(conversation?.id===c.id){conversation=null;pending=null;references=[];ask='';editingMessage=null;retryIndex=null;error=''}
+   await history();
+   notify($t("已删除问答记录"),async()=>{await api('edit_conversation',{id:c.id,title:null,deleted:false});await history();notify($t("已恢复问答记录"))});
+  }catch(e){notify($t(String(e)))}
+ }
+ function chatMenu(e:MouseEvent,c:Conversation){
+  if((askBusy||cancellingAsk)&&conversation?.id===c.id)return;
+  const trigger=e.currentTarget as HTMLElement,rect=trigger.getBoundingClientRect();
+  menu={x:Math.min(e.clientX||rect.left,innerWidth-240),y:Math.min((e.clientY||rect.bottom)+8,innerHeight-92),trigger,items:[
+   {label:$t("重命名"),glyph:'edit',run:()=>{renameId=c.id;renameTitle=c.title;renameError=''}},
+   {label:$t("删除"),glyph:'close',run:()=>deleteConversation(c)}
+  ]};
+ }
+ async function rename(){
+  if(renaming||!renameTitle.trim())return;
+  renaming=true;renameError='';
+  try{await api('edit_conversation',{id:renameId,title:renameTitle.trim(),deleted:null});await history();renameId=''}
+  catch(e){renameError=$t(String(e))}finally{renaming=false}
+ }
+ async function copyMessage(text:string){try{await copyText(text);notify($t("已复制"))}catch(e){notify($t('复制失败：{value0}',{value0:$t(String(e))}))}}
+ async function replaceMessages(id:string,messages:Message[]){const updated=await api<Conversation>('replace_messages',{id,messages});if(conversation?.id===id){conversation=updated;pending=null}await history()}
+ async function deleteMessage(index:number){try{const before=structuredClone(conversation!);await replaceMessages(before.id,before.messages.filter((_,i)=>i!==index));editingMessage=null;notify($t("已删除此轮问答"),async()=>{await replaceMessages(before.id,before.messages);notify($t("已恢复此轮问答"))})}catch(e){notify($t(String(e)))}}
+ async function beginEdit(index:number){editingMessage=index;editingText=displayedMessages[index].question;await tick();messageInput.focus();messageInput.setSelectionRange(editingText.length,editingText.length)}
+ async function regenerate(index:number,question:string){const before=conversation?structuredClone(conversation):null;const message=displayedMessages[index];editingMessage=null;retryIndex=null;if(!helpMode){scope=[...message.scope];references=[...message.references];}ask=question;await run('ask',before&&index<before.messages.length?index:undefined);if(before)notify(error?$t("重新生成未完成"):$t("已重新生成回答"),async()=>{await replaceMessages(before.id,before.messages);notify($t("已恢复原问答"))})}
+ function retryMessage(index:number){if(index<displayedMessages.length-1)retryIndex=index;else void regenerate(index,displayedMessages[index].question)}
+ async function newChat(nextHelp=helpMode){
+  if(askBusy||cancellingAsk||!await protect())return;
+  nextDocumentReadRequest();editingMessage=null;retryIndex=null;await stop('ask');
+  if(nextHelp)helpQuestion=(helpQuestion+1)%helpQuestions.length;
+  helpMode=nextHelp;conversation=null;pending=null;ask='';references=[];mention=false;source=null;error='';view='ask';draft=null;
+  await tick();askInput?.focus({preventScroll:true});
+ }
+ async function stopSummary(){const id=summaryJob;summaryJob='';summaryBusy=false;if(id)await api('cancel_query',{id});}
+ async function summarizeSearch(question:string,candidates:Candidate[]){
+  if(!settings||settings.search_summary_enabled===false||!candidates.length||(settings.answer.auth_mode!=='none'&&settings.answer.has_key===false)||!(settings.search_summary_model||settings.answer.model).trim())return;
+  summarySelected=true;lastSearchFocus=candidates[0];
+  const id=requestId();summaryJob=id;summaryBusy=true;summaryError='';summaryText='';summaryContext=null;summaryEvidence=documentResults(candidates).slice(0,settings?.search_summary_sources??10).map(group=>group.first);
+  try{const output=await api<SearchSummaryResult>('summarize_search',{id,question,results:summaryEvidence});if(summaryJob===id){summaryText=output.text;summaryEvidence=output.evidence;summaryContext=output.context}}
+  catch(e){if(summaryJob===id)summaryError=$t(String(e))}
+  finally{if(summaryJob===id){summaryBusy=false;summaryJob='';
+   // Without a summary to show, the reader opens the first result instead.
+   if(!summaryText&&!summaryError&&!focus&&results.length)void focusResult(results[0]);}}
+ }
+ async function stop(kind:'ask'|'search'=view==='search'?'search':'ask'){
+  if(kind==='ask'){
+   const id=askJob;if(!id||cancellingAsk===id)return;
+   cancellingAsk=id;toolApproval=null;
+   try{
+    await api('cancel_query',{id});
+    if(askJob===id){askJob='';askBusy=false;askStage='';if(pending)pending={...pending,status:'stopped'}}
+   }catch(e){notify($t(String(e)))}
+   finally{if(cancellingAsk===id){toolApproval=null;cancellingAsk=''}}
+  }
+  else{const summaryCancellation=stopSummary();if(searchBusy)searchStopped=true;const id=searchJob;searchJob='';searchBusy=false;paging=false;searchPage=searchPagination?.page??1;searchStage='';await Promise.all([summaryCancellation,...(id?[api('cancel_query',{id})]:[])]);}
+ }
+ async function resetSearch(focusInput=true){
+  await stop('search');passagesOpen=false;summarySelected=false;searchFocusMode=false;rememberedCandidates.clear();summaryText='';summaryError='';summaryEvidence=[];summaryContext=null;search='';searched=false;results=[];focus=null;previewDocument=null;preview='';previewError='';previewLoading=false;abandonPreview();searchTerms=[];searchQuestion='';searchPagination=null;searchPage=1;searchElapsed=null;searchError='';
+  await tick();if(focusInput)searchInput.focus();
+ }
+ async function clearAllDataState(){
+  clearTimeout(draftTimer);draft=null;dirty=false;readOnlyDoc=null;
+  await resetSearch(false);searchHistory=[];clearConversationState();clearFoldersState();
+  librarySessions={};exploreReturn='';documentFromSearch=false;documentFromConversation=false;view='ask';
+  for(const key of Object.keys(localStorage))if(key.startsWith('sag.')&&(!web||key!=='sag.web.code'))localStorage.removeItem(key);
+  settings=await api<Settings>('get_settings');setLanguage(settings.language);
+  notify($t('所有应用数据已清除，设置已恢复默认，本地原文件已保留。'));
+ }
+ function clearSearchHistory(){
+  try{localStorage.removeItem('sag.search.history');searchHistory=[]}catch(e){notify($t(String(e)))}
+ }
+ function mentionPlacement(node:HTMLFormElement){
+  function update(){
+   const anchor=node.getBoundingClientRect(),boundary=workspaceContent.getBoundingClientRect();
+   const above=anchor.top-Math.max(0,boundary.top)-14,below=Math.min(window.innerHeight,boundary.bottom)-anchor.bottom-14;
+   // Compare against the full menu height, even after a smaller window has shrunk it.
+   mentionSide=above>=300||above>=below?'top':'bottom';
+  }
+  const observer=new ResizeObserver(update);observer.observe(node);observer.observe(workspaceContent);
+  window.addEventListener('resize',update);workspaceContent.addEventListener('scroll',update,true);update();
+  return {destroy(){observer.disconnect();window.removeEventListener('resize',update);workspaceContent.removeEventListener('scroll',update,true)}};
+ }
+ function mentionUpdate(){if(helpMode)return;const value=askInput.value.slice(0,askInput.selectionStart);const match=value.match(/(?:^|\s)@([^@\n]*)$/);mention=!!match;if(match){mentionStart=value.lastIndexOf('@');mentionEnd=askInput.selectionStart;mentionTerm=match[1];mentionIndex=0;}}
+ function reference(path:string){references=[...references,path];ask=ask.slice(0,mentionStart)+ask.slice(mentionEnd);mention=false;tick().then(()=>{askInput.focus();askInput.setSelectionRange(mentionStart,mentionStart)})}
+ function imeKey(e:KeyboardEvent){return composing||e.isComposing||e.keyCode===229||(e.key==='Enter'&&performance.now()-compositionEndedAt<100)}
+ function compositionStart(){composing=true}
+ function compositionEnd(){composing=false;compositionEndedAt=performance.now()}
+ function compositionKeyUp(e:KeyboardEvent){if(e.key==='Enter')compositionEndedAt=-Infinity}
+ function isModelKeyError(error:string,message:string){const detail=error.replace(/^Error: /,'');return detail===message||detail===$t(message)}
+ function changeSearchMode(value:string){searchMode=value as 'search'|'deep_search';searchModeChosen=true;localStorage.setItem('sag.search.mode',searchMode);if(searched&&search.trim())void run(searchMode);}
+ async function changeSearchPage(page:number){
+  if(searchBusy||page===searchPagination?.page)return;
+  if(!searchRanked){await run('search',undefined,page);return;}
+  searchPage=page;searchPagination={...searchPagination!,page};activeResult=0;
+  void focusResult(rankedGroups[(page-1)*20].first);
+  await tick();if(searchList)searchList.scrollTop=0;
+ }
+ function searchKey(e:KeyboardEvent){if(e.key==='Enter'&&imeKey(e)&&!composing&&!e.isComposing)e.preventDefault()}
+ function askKey(e:KeyboardEvent){if(imeKey(e)){if(e.key==='Enter'&&!composing&&!e.isComposing)e.preventDefault();return;}if(helpSuggestion&&!ask.trim()&&e.key==='Tab'&&!e.shiftKey&&!e.altKey&&!e.ctrlKey&&!e.metaKey){e.preventDefault();ask=helpSuggestion;void tick().then(()=>askInput?.setSelectionRange(ask.length,ask.length));return;}if(mention){if(e.key==='Escape'){mention=false;e.preventDefault()}else if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();mentionIndex=(mentionIndex+(e.key==='ArrowDown'?1:-1)+mentions.length)%Math.max(1,mentions.length);tick().then(()=>{document.querySelector<HTMLElement>('.mention-options [aria-selected="true"]')?.scrollIntoView({block:'nearest',inline:'nearest',behavior:'instant'})})}else if(e.key==='Enter'&&mentions[mentionIndex]){e.preventDefault();reference(mentions[mentionIndex].path);return}else if(e.key==='Enter'){mention=false}else return;if(mention)return}if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();void run('ask')}}
+ async function run(kind:'ask'|'search'|'deep_search',replaceFrom?:number,page?:number){
+  if(composing||performance.now()-compositionEndedAt<100)return;
+  const askingHelp=kind==='ask'&&helpMode;
+  const question=(kind==='ask'?ask.trim()||helpSuggestion:page===undefined?search:searchQuestion).trim();
+  if(!question||(kind==='ask'?askBusy||cancellingAsk:searchBusy)||!settings)return;
+  if(page===undefined&&matchMedia('(max-width: 680px), (pointer: coarse)').matches)(kind==='ask'?askInput:searchInput)?.blur();
+  closeNotice();menu=null;
+  const id=requestId(),conversationId=conversation?.id||null;let summaryCancellation:Promise<void>|undefined;
+  if(kind==='ask'){
+   error='';askJob=id;askBusy=true;askStage='思考中';activeToolId='';
+   if(!conversation)conversation={id,title:question.slice(0,30),messages:[],updated:Date.now(),deleted:false};
+   chatScrollKey++;pendingHistoryLength=replaceFrom??conversation.messages.length;
+   pending={created_at:Date.now(),help:askingHelp,question,answer:'',evidence:[],model:settings.answer.model,scope:askingHelp?[]:[...scope],references:askingHelp?[]:[...references],status:'running',error:null,retrieval_question:question};ask='';mention=false;
+  }else{
+   if(page===undefined){summaryCancellation=stopSummary();summaryText='';summaryError='';summaryEvidence=[];summaryContext=null}
+   searchError='';searchJob=id;searchBusy=true;searchJobKind=kind;searchStage=kind==='search'?'正在搜索本地文件':'SAG2 正在分析';
+   paging=page!==undefined;searched=true;searchStopped=false;searchElapsed=null;searchRanked=kind==='deep_search';
+   if(!paging){searchGeneration++;rememberedCandidates.clear();passagesOpen=false;summarySelected=false;previewFindOpen=false;previewFindTerm='';searchFocusMode=false;searchQuestion=question;searchPagination=null;searchPage=1;results=[];searchTerms=[];focus=null;previewDocument=null;preview='';previewError='';previewLoading=false;abandonPreview()}
+  }
+  try{
+   if(summaryCancellation)await summaryCancellation;
+   if(kind!=='ask'&&page===undefined){const recent=[question,...searchHistory.filter(item=>item!==question)].slice(0,8);localStorage.setItem('sag.search.history',JSON.stringify(recent));searchHistory=recent;}
+   if(kind==='ask'&&!answerRenderer)renderAnswers(displayedMessages);
+   const output=await api<QueryOutput>('run_query',{query:{id,kind:askingHelp?'ask_help':kind,question,scope:askingHelp?[]:scope,references:kind==='ask'&&!askingHelp?references:[],model:settings.answer.model,conversation_id:kind==='ask'?conversationId:null,replace_from:replaceFrom??null,page:kind==='search'?(page??1):null}});
+   if((kind==='ask'?askJob:searchJob)!==id)return;
+   if(kind==='ask'){conversation=output.conversation;pending=null;references=[];await history()}
+   else{searchTerms=output.terms||[];results=output.results;searchRanked=kind==='deep_search';searchElapsed=output.elapsed_ms??null;searchPagination=kind==='deep_search'?{total:documentResults(output.results).length,page:1,page_size:20}:output.pagination??null;searchPage=searchPagination?.page??1;await tick();if(searchList)searchList.scrollTop=0;if(page===undefined){activeResult=0;passagesOpen=false;void summarizeSearch(question,output.results)}if(page!==undefined||!summarySelected){const kept=results.find(c=>c.path===focus?.path);if(kept)void focusResult(kept,true);else if(results.length)void focusResult(results[0]);else{focus=null;abandonPreview()}}}
+  }catch(e){
+   if((kind==='ask'?askJob:searchJob)===id){
+    if(kind==='ask'){error=$t(String(e));if(pending)pending={...pending,status:'failed',error};await history()}
+    else searchError=$t(String(e));
+   }
+  }finally{
+   if(kind==='ask'){if(askJob===id){askBusy=false;askStage='';askJob='';toolApproval=null}}
+   else if(searchJob===id){searchBusy=false;paging=false;searchPage=searchPagination?.page??1;searchStage='';searchJob=''}
+  }
+ }
+// New searches open the automatic summary; selecting a result opens its source.
+ let activeResult=0,resultsFocused=false,passagesOpen=false,passageReturn:HTMLElement|null=null;
+ let searchFocusMode=false,summarySelected=false,lastSearchFocus:Candidate|null=null;
+ let previewFindOpen=false,previewFindDraft='',previewFindTerm='',previewFindInput:HTMLInputElement;
+ const searchSession=requestId();
+ let searchGeneration=0,restorePreview=false;
+ const rememberedCandidates=new Map<string,Candidate>();
+ $:focusedGroup=focus?rankedGroups.find(group=>group.first.path===focus?.path):null;
+ $:focusedPassages=focusedGroup?.matches??(focus?[focus]:[]);
+ $:passageIndex=Math.max(0,focusedPassages.findIndex(c=>c.id===focus?.id));
+ $:readerTerms=previewFindOpen?(previewFindTerm?[previewFindTerm]:searchTerms):previewReader?.doc===previewDocument?previewReader.terms:searchTerms;
+ $:readerMemoryKey=previewDocument?JSON.stringify([searchSession,searchGeneration,previewDocument.path,previewDocument.hash,previewFindTerm]):'';
+ $:if(view!=='search'){passagesOpen=false;searchFocusMode=false;}
+
+ let searchListWidth=Math.min(520,Math.max(260,Number(localStorage.getItem('sag.search.listWidth'))||340));
+ $:showSummary=settings?.search_summary_enabled!==false&&(summaryBusy||!!summaryText||!!summaryError);
+ $:if(summaryText&&!answerRenderer)void loadAnswerRenderer();
+ $:renderedSummary=summaryText&&answerRenderer?answerRenderer(summaryText,summaryEvidence):null;
+ $:summaryCitations=citedNumbers(renderedSummary?.sources??[]);
+ function closePassages(restore=true){
+  passagesOpen=false;
+  if(restore)tick().then(()=>{if(passageReturn?.isConnected)passageReturn.focus({preventScroll:true});else document.querySelector<HTMLButtonElement>('.search-passage-trigger')?.focus()});
+ }
+ function togglePassages(path:string){
+  if(passagesOpen&&focus?.path===path){closePassages();return;}
+  passageReturn=document.activeElement instanceof HTMLElement?document.activeElement:null;
+  const candidate=rankedGroups.find(group=>group.first.path===path)?.first??(focus?.path===path?focus:null);if(!candidate)return;
+  if(focus?.path!==path)void focusResult(candidate,true);
+  passagesOpen=true;
+ }
+ function selectPassage(candidate:Candidate){closePassages();void focusResult(candidate,false);}
+ function stepPassage(step:number){const next=focusedPassages[passageIndex+step];if(next){closePassages(false);void focusResult(next,false);}}
+ function abandonPreview(){previewRequest++;previewTrace?.cancel();previewLoading=false;}
+ function leaveSearchReader(){closePassages(false);focus=null;summarySelected=false;abandonPreview();searchFocusMode=false;tick().then(()=>searchList?.focus({preventScroll:true}));}
+ function toggleSearchSummary(){
+  closePassages(false);searchFocusMode=false;
+  if(summarySelected){summarySelected=false;if(lastSearchFocus)void focusResult(lastSearchFocus,true);return;}
+  if(!showSummary)return;
+  lastSearchFocus=focus;focus=null;abandonPreview();summarySelected=true;previewFindOpen=false;
+ }
+ async function openPreviewFind(){previewFindOpen=true;await tick();previewFindInput?.focus();}
+ function applyPreviewFind(){if(previewFindTerm&&previewFindTerm===previewFindDraft.trim()){document.querySelector<HTMLButtonElement>('.search-preview .match-next')?.click();return;}previewFindTerm=previewFindDraft.trim();restorePreview=false;}
+ function closePreviewFind(){previewFindOpen=false;previewFindDraft='';previewFindTerm='';restorePreview=true;tick().then(()=>document.querySelector<HTMLButtonElement>('.search-find-trigger')?.focus());}
+ function searchOutside(event:MouseEvent){if(passagesOpen&&event.target instanceof Element&&!event.target.closest('.search-passage-picker,.search-passage-trigger,.search-result-more'))closePassages(false);}
+
+ function showResult(index:number){
+  if(!groups.length)return;
+  activeResult=(index+groups.length)%groups.length;
+  closePassages(false);void focusResult(groups[activeResult].first,true);
+  tick().then(()=>document.getElementById(`search-result-${activeResult}`)?.scrollIntoView({block:'nearest'}));
+ }
+ function resultKeys(e:KeyboardEvent){
+  const button=e.target instanceof Element?e.target.closest('button'):null;
+  if(button&&(e.key==='Enter'||e.key===' ')&&!e.metaKey&&!e.ctrlKey)return;
+  const group=groups[activeResult];if(!group)return;
+  if(button&&['ArrowDown','ArrowUp','Home','End','ArrowRight','ArrowLeft'].includes(e.key))searchList.focus({preventScroll:true});
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();showResult(activeResult+(e.key==='ArrowDown'?1:-1))}
+  else if(e.key==='Home'||e.key==='End'){e.preventDefault();showResult(e.key==='Home'?0:groups.length-1)}
+  else if(e.key==='ArrowRight'){e.preventDefault();togglePassages(group.first.path)}
+  else if(e.key==='ArrowLeft'&&passagesOpen){e.preventDefault();closePassages()}
+  else if(e.key==='Enter'&&(e.metaKey||e.ctrlKey)){e.preventDefault();void edit(group.first.path,searchTerms)}
+  else if(e.key==='Enter'){e.preventDefault();showResult(activeResult)}
+ }
+ function setListWidth(width:number){searchListWidth=Math.round(Math.min(520,Math.max(260,width)));try{localStorage.setItem('sag.search.listWidth',String(searchListWidth))}catch{}}
+ function startResize(e:PointerEvent){
+  const handle=e.currentTarget as HTMLElement,start=e.clientX,width=searchListWidth;
+  handle.setPointerCapture(e.pointerId);
+  const move=(event:PointerEvent)=>setListWidth(width+event.clientX-start);
+  const end=()=>{handle.removeEventListener('pointermove',move);handle.removeEventListener('pointerup',end);handle.removeEventListener('pointercancel',end)};
+  handle.addEventListener('pointermove',move);handle.addEventListener('pointerup',end);handle.addEventListener('pointercancel',end);
+ }
+ function resizeKey(e:KeyboardEvent){if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();setListWidth(searchListWidth+(e.key==='ArrowRight'?16:-16))}}
+ async function focusResult(candidate:Candidate,restore=false,resume=false){
+   suspendedPreview=null;
+   if(focus)rememberedCandidates.set(focus.path,focus);
+   const remembered=rememberedCandidates.get(candidate.path);
+   const c=restore&&remembered?remembered:candidate;
+   if(focus?.id===c.id&&previewDocument&&!previewLoading&&restore){summarySelected=false;return;}
+   restorePreview=resume;summarySelected=false;
+   if(!resume){previewFindOpen=false;previewFindDraft='';previewFindTerm='';}
+  const index=groups.findIndex(group=>group.first.path===c.path);if(index>=0)activeResult=index;
+  focus=c;rememberedCandidates.set(c.path,c);previewDocument=null;previewReader=null;preview='';previewError='';previewLoading=true;const request=++previewRequest;
+  const trace=beginDocumentTrace('reader');previewTrace=trace;
+  try{
+   const readDone=trace.stage('read-rpc');let doc:Document;try{doc=await api<Document>('read_document',{path:c.path});}finally{readDone();}
+   if(request!==previewRequest||focus?.id!==c.id){trace.cancel();return;}
+   if(isLargeMarkdown(doc)){
+    const stop=trace.stage('component');
+    try{LargeReader=(await import('./components/LargeDocumentReader.svelte')).default;}finally{stop();}
+    if(request!==previewRequest||focus?.id!==c.id){trace.cancel();return;}
+    previewDocument=doc;
+    if(doc.hash!==c.hash)previewError=$t('原文件已更新，以下显示当前内容。');
+    return;
+   }
+   trace.cancel();
+   if(isMarkdown(c.path)&&!legacyPreview()){
+    const [{markdownModel,candidateRanges,modelCitationTerms},{default:Reader}]=await Promise.all([import('./lib/document-model'),import('./components/MarkdownReader.svelte')]);
+    if(request!==previewRequest||focus?.id!==c.id)return;
+    const model=markdownModel(doc),ranges=candidateRanges(model,c);
+    const terms=await modelCitationTerms(model,c,ranges);
+    if(request!==previewRequest||focus?.id!==c.id)return;
+    previewReader={doc,Reader,model,target:ranges[0].from,terms};previewDocument=doc;preview='';
+    if(doc.hash!==c.hash)previewError=$t('原文件已更新，以下显示当前内容。');
+    return;
+   }
+   const initial=await documentMatchIndex(doc.body,c.path,searchTerms,c);
+   const md=isMarkdown(c.path)?await import('./lib/markdown'):null;
+   if(request!==previewRequest||focus?.id!==c.id)return;
+   previewDocument=doc;previewInitialMatch=initial;preview=md?md.renderMarkdown(doc.body):isHtml(c.path)?'':readonlyHtml(c.path,doc.body);
+   if(doc.hash!==c.hash)previewError=$t('原文件已更新，以下显示当前内容。');
+  }catch(e){trace.cancel();if(request===previewRequest)previewError=$t(String(e))}
+  finally{if(request===previewRequest)previewLoading=false}
+ }
+ async function chooseHistory(c:Conversation){if(conversation?.id===c.id||askBusy||cancellingAsk||!await protect())return;nextDocumentReadRequest();editingMessage=null;await stop('ask');chatScrollKey++;view='ask';draft=null;conversation=c;helpMode=isAssistantConversation(c);pending=null;references=[];ask='';mention=false;source=null;error='';}
+ function setReasoning(value:ReasoningEffort|null){if(!settings)return;const model=settings.answer.model;const profile=settings.model_profiles?.[model]??{system_prompt:'',sag2_enabled:true,mcp_servers:[],mcp_tools:{}};settings={...settings,model_profiles:{...settings.model_profiles,[model]:{...profile,reasoning_effort:value}}};}
+ async function saveReasoning(){if(!settings)return;try{await api('save_settings',{settings,answerKey:'',jevKey:'',mcpCredentials:{}})}catch(e){notify($t('思考强度保存失败：{value0}',{value0:$t(String(e))}))}}
+ async function saveSettings(value:Settings,a:string,j:string,credentials:Record<string,McpCredentials>={},mineruKey=''){
+  const moving=!web&&JSON.stringify(value.conversion_storage??{mode:'library'})!==JSON.stringify(settings?.conversion_storage??{mode:'library'});
+  if(moving&&dirty&&draft?.source_path&&!await save())throw new Error($t('请先保存当前转换文档'));
+  await api('save_settings',{settings:value,answerKey:a,jevKey:j,mcpCredentials:credentials,mineruKey});
+  settings=await api<Settings>('get_settings');setLanguage(settings.language);
+  if(settings.search_summary_enabled===false)await stopSummary();cache={};await refresh();
+  if(moving){
+   const byOriginal=new Map(files.filter(file=>file.source_path).map(file=>[file.source_path!,file.path]));
+   if(draft?.source_path){const path=byOriginal.get(draft.source_path);if(path)draft={...draft,path};}
+   if(readOnlyDoc?.source_path){
+    const path=byOriginal.get(readOnlyDoc.source_path);
+    if(path&&path!==readOnlyDoc.path){
+     readOnlyDoc={...readOnlyDoc,path};restoreDocumentScroll=true;
+     if(largeCandidate)largeCandidate={...largeCandidate,path};
+     if(isNote(readOnlyDoc.body))void loadNote(path);
+    }
+   }
+   results=results.map(candidate=>candidate.source_path&&byOriginal.has(candidate.source_path)?{...candidate,path:byOriginal.get(candidate.source_path)!}:candidate);
+   const focused=focus&&results.find(candidate=>candidate.id===focus!.id);
+   if(focused&&focused.path!==focus?.path)await focusResult(focused);
+  }
+ }
+ async function keys(e:KeyboardEvent){if(onboardingOpen)return;if(e.key==='Escape'){if(view==='search'&&passagesOpen){e.preventDefault();closePassages();return;}if(view==='search'&&previewFindOpen){e.preventDefault();closePreviewFind();return;}if(view==='search'&&searchFocusMode){e.preventDefault();searchFocusMode=false;return;}if(leave||renameId||settingsOpen||quickSetupOpen||historySearchOpen||folderPickerOpen||chooseSaveFolder||menu||source||scopeOpen||toolApproval)return;if(narrowLayout&&mobileSidebarOpen&&!indexDetailsOpen){e.preventDefault();await toggleMobileSidebar(false);return;}if(mention){mention=false;return;}if(view==='search'&&focus&&showSummary&&!(e.target instanceof Element&&e.target.closest('input,textarea,[contenteditable=true],[role=listbox]:not(.search-results)'))){toggleSearchSummary()}return;}if(view==='search'&&focus&&(e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='f'){e.preventDefault();await openPreviewFind();return;}if(view==='search'&&focus&&(e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='g'){e.preventDefault();previewFindOpen=true;await tick();document.querySelector<HTMLButtonElement>(`.search-preview ${e.shiftKey?'.match-previous':'.match-next'}`)?.click();return}if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='s'&&view==='editor'){e.preventDefault();await save()}if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();await navigate('search')}if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='n'){e.preventDefault();await newChat()}}
+ onMount(()=>{
+  const openLink=(event:Event)=>{void api('open_external_link',{url:(event as CustomEvent<string>).detail}).catch(e=>notify($t(String(e))));};
+  window.addEventListener('open-external-link',openLink);
+  return()=>window.removeEventListener('open-external-link',openLink);
+ });
+ onMount(()=>{const cleanup:(()=>void)[]=[];let active=true;const addCleanup=(stop:()=>void)=>{if(active)cleanup.push(stop);else stop();};addCleanup(pollIndexStatus());void(async()=>{try{addCleanup(await listen('quit-requested',requestQuit));addCleanup(await listen<string>('app-error',e=>{if(loading)startupError=e.payload;else notify(e.payload)}));addCleanup(await listen<IndexProgress>('index-progress',e=>{refreshGeneration++;if(refreshRunning)refreshPending=true;indexProgress=e.payload;roots=roots.map(r=>r.path===e.payload.path?{...r,status:'indexing'}:r)}));addCleanup(await subscribeDataChanges(()=>{void refresh().catch(e=>notify($t(String(e))))}));addCleanup(await listen('history-changed',()=>history().catch(e=>notify($t(String(e))))));addCleanup(await listen('settings-changed',async()=>{try{settings=await api<Settings>('get_settings');setLanguage(settings.language);if(settings.search_summary_enabled===false)await stopSummary()}catch(e){notify($t(String(e)))}}));addCleanup(await listen<ToolApproval>('tool-approval',e=>{if(e.payload.query_id===askJob&&e.payload.query_id!==cancellingAsk)toolApproval=e.payload}));addCleanup(await listen<Progress>('query-progress',e=>{if(e.payload.id===summaryJob){if(e.payload.delta!==null)summaryText=e.payload.replace?e.payload.delta:summaryText+e.payload.delta;return;}if(e.payload.id===searchJob){searchStage=e.payload.stage;return;}if(e.payload.id!==askJob||e.payload.id===cancellingAsk)return;askStage=e.payload.stage;if(pending&&e.payload.tool){const {call,finished}=e.payload.tool;activeToolId=finished?'':call.id;pending={...pending,tool_calls:[...(pending.tool_calls||[]).filter(t=>t.id!==call.id),call]};}if(pending&&e.payload.reasoning_delta)pending={...pending,reasoning:(pending.reasoning||'')+e.payload.reasoning_delta};if(pending&&e.payload.reasoning_block){const block=e.payload.reasoning_block;const blocks=[...(pending.reasoning_blocks||[])];const last=blocks.at(-1);if(last&&last.answer_offset===block.answer_offset&&last.tool_count===block.tool_count)blocks[blocks.length-1]={...last,content:last.content+block.content};else blocks.push(block);pending={...pending,reasoning_blocks:blocks};}if(pending&&e.payload.delta!==null)pending={...pending,answer:e.payload.replace?e.payload.delta:pending.answer+e.payload.delta,reasoning_blocks:e.payload.replace?pending.reasoning_blocks?.map(block=>({...block,answer_offset:Math.min(block.answer_offset,e.payload.delta!.length)})):pending.reasoning_blocks};}));await loadWorkspace();if(!web)await api('quick_search_main_ready');const saved=await api<Draft[]>('list_drafts');if(saved.length){notify($t("有 {value0} 份未保存草稿",{value0:saved.length}),async()=>{draft=saved[0];dirty=true;selected=draftFolder(draft);EditorComponent=(await import('./components/RichEditor.svelte')).default;view='editor';closeNotice()})}}catch(e){startupError=String(e)}finally{if(active)loading=false}})();return()=>{active=false;appDisposed=true;cancelDocumentTrace();refreshGeneration++;clearTimeout(draftTimer);clearTimeout(noticeTimer);cleanup.forEach(fn=>fn())}});
+</script>
+<svelte:window on:focus={()=>void checkShareClipboard()} bind:innerWidth={viewportWidth} on:keydown={keys} on:click={searchOutside} on:contextmenu|preventDefault/>
+<div class="desktop-window real-client" class:windows-client={!web&&!mac} class:narrow-layout={narrowLayout} class:compact-sidebar={collapsed&&!narrowLayout} class:search-workbench={view==='search'} data-sidebar-motion={sidebarMotion}>
+ {#if narrowLayout&&!web}
+  <div class="compact-window-bar" data-tauri-drag-region>{#if !mac}<DesktopWindowControls/>{/if}</div>
+ {/if}
+ <div class="shell">
+ {#if narrowLayout&&mobileSidebarOpen}<Button.Root type="button" class="mobile-sidebar-backdrop" tabindex={-1} aria-label={$t("收起侧边栏")} onclick={()=>toggleMobileSidebar(false)}/>{/if}
+ <aside class="sidebar" id="workspace-sidebar" hidden={narrowLayout&&!mobileSidebarOpen}><div class="sidebar-titlebar" data-tauri-drag-region>{#if !mac&&!web&&!narrowLayout}<DesktopWindowControls/>{/if}<Button.Root bind:ref={sidebarToggle} class="icon-button" aria-label={!narrowLayout&&collapsed?$t("展开侧边栏"):$t("收起侧边栏")} title={!narrowLayout&&collapsed?$t("展开侧边栏"):$t("收起侧边栏")} aria-controls="workspace-sidebar" aria-expanded={narrowLayout?mobileSidebarOpen:!collapsed} onclick={toggleSidebar}>{@html icon('panel')}</Button.Root></div><div class="brand-row">{@html logo}<span class="brand">{'Super-SAG'}</span></div>
+ <div class="tree-heading"><Button.Root class="folder-management-link" onclick={()=>{if(narrowLayout)void toggleMobileSidebar(false);void libraryBrowse('').catch(e=>notify($t(String(e))));}}>{$t("文件夹管理")}</Button.Root><Button.Root class="icon-button" title={$t(web?"创建文件夹":"添加文件夹")} aria-label={$t(web?"创建文件夹":"添加文件夹")} disabled={web&&!webLibrary} onclick={add}>{@html icon('plus')}</Button.Root></div><div class="tree" use:rememberScroll={{key:'sag.sidebar.library.scroll',enabled:!loading&&(narrowLayout?mobileSidebarOpen:!collapsed)}}><Tree nodes={roots} {expanded} cache={indexedCache} selected={view==='files'?selected:view==='editor'&&draft?indexedSourcePath(draft.path):view==='document'&&readOnlyDoc?indexedSourcePath(readOnlyDoc.path,readOnlyDoc.source_path):''} onbrowse={(path)=>{if(narrowLayout)void toggleMobileSidebar(false);void browse(path).catch(e=>notify($t(String(e))));}} ontoggle={(path)=>toggle(path).catch(e=>notify($t(String(e))))} onmenu={showMenu}/>{#if !loading&&!roots.length}<div class="folder-empty-state"><p>{$t("添加文件夹后，即可对其中的文件提问和搜索。")}</p>{#if !web}<Button.Root class="outline" onclick={add}>{@html icon('plus')}<span>{$t("添加文件夹")}</span></Button.Root>{/if}</div>{/if}</div>
+ <div class="index-status">{#if !activeIndexCardHidden&&(roots.length||indexing||retryCycleActive)&&dismissedIndexResult!==indexResultSignature}<IndexStatusCard active={indexing||retryCycleActive} paused={indexPaused} retrying={retryCycleActive||rebuildingFailedIndexes} retryBusy={rebuildingFailedIndexes} retryTotal={retryDocuments.length||failedIndexFiles} task={indexProgress?indexParserTask:(indexTasks.find(task=>task.kind!=='enhancement')??indexTasks[0])} progress={indexProgress} failures={retryCycleActive?retryDocuments:failedIndexDocuments} failureCount={retryCycleActive?retryDocuments.length||failedIndexFiles:failedIndexFiles} {roots} {conversionStates} recentFiles={recentIndexedFiles} retryError={failedIndexRetryError} onPause={toggleIndexPause} onDismiss={()=>{if(indexing||indexPaused||retryCycleActive||rebuildingFailedIndexes)activeIndexCardHidden=true;else dismissedIndexResult=indexResultSignature}} onRetry={rebuildFailedIndexes} onHistory={()=>indexDetailsOpen=true}/>{/if}</div><div class="sidebar-bottom"><div class="sidebar-tools"><Button.Root class="sidebar-settings" aria-label={$t("设置")} title={$t("设置")} onclick={()=>{settingsPage='general';settingsOpen=true}}>{@html icon('settings')}<span>{$t("设置")}</span></Button.Root><DoclingDownload/>{#if onWebSignOut}<Button.Root title={$t("退出网页")} aria-label={$t("退出网页")} onclick={async()=>{if(await protect())onWebSignOut?.()}}>{$t("退出")}</Button.Root>{/if}<Button.Root class="sidebar-help" aria-label={$t("打开帮助文档")} title={$t("打开帮助文档")} onclick={()=>{void api('open_external_link',{url:'https://github.com/CalmBuilder/Super-SAG/tree/main/docs-site/content/docs'}).catch(e=>notify($t(String(e))));}}>{@html icon('help')}</Button.Root><Button.Root aria-label={$t("切换明暗主题")} onclick={()=>{if(settings)saveSettings({...settings,theme:settings.theme==='dark'?'light':'dark'},'','').then(()=>notify($t('设置已保存'))).catch(e=>notify($t(String(e))))}}>{@html icon(settings?.theme==='dark'?'sun':'moon')}</Button.Root></div></div></aside>
+ <main class="workspace" inert={narrowLayout&&mobileSidebarOpen}><div class="workspace-header" data-tauri-drag-region>
+ {#if narrowLayout}<Button.Root bind:ref={mobileSidebarToggle} type="button" class="icon-button mobile-sidebar-toggle" aria-label={$t("展开侧边栏")} aria-controls="workspace-sidebar" aria-expanded={mobileSidebarOpen} onclick={()=>toggleMobileSidebar(true)}>{@html icon('panel')}</Button.Root>{/if}
+ {#if narrowLayout && ((view==='ask'&&(shownMessages.length||pending))||(view==='search'&&searched))}<span class="workspace-page-title">{$t(view==='ask'?'问答':'搜索')}</span>{/if}
+ {#if view==='ask'&&(shownMessages.length||pending)}<Button.Root class="icon-button workspace-back chat-new" title={$t("返回会话列表")} aria-label={$t("返回会话列表")} disabled={askBusy||!!cancellingAsk} onclick={()=>newChat()}>{@html icon('back')}</Button.Root>{:else if view==='search'&&searched}<Button.Root class="icon-button workspace-back" title={$t("返回搜索")} aria-label={$t("返回搜索")} onclick={()=>resetSearch().catch(e=>notify($t(String(e))))}>{@html icon('back')}</Button.Root>{/if}
+ <nav class="workspace-switch" class:has-indicator={!web} class:slide-indicator={slideWorkspaceTab} data-tab={fileView?2:view==='search'?1:0} aria-label={$t("问答、搜索与文件")}>
+  {#if !web}<span class="workspace-switch-indicator" aria-hidden="true" on:transitionend={()=>slideWorkspaceTab=false}></span>{/if}
+  <Button.Root class={`nav-item ${view==='ask'?'active':''}`} aria-current={view==='ask'?'page':undefined} title={$t("问答")} onclick={(event:MouseEvent)=>navigate('ask',event.detail>0)}>{@html icon('chat')}<span>{$t("问答")}</span></Button.Root>
+  <Button.Root class={`nav-item ${view==='search'?'active':''}`} aria-current={view==='search'?'page':undefined} title={$t("搜索（⌘ / Ctrl + K）")} onclick={(event:MouseEvent)=>navigate('search',event.detail>0)}>{@html icon('search')}<span>{$t("搜索")}</span></Button.Root>
+  <Button.Root class={`nav-item ${fileView?'active':''}`} aria-current={fileView?'page':undefined} title={$t("文件")} onclick={(event:MouseEvent)=>navigate('files',event.detail>0)}>{@html icon('folder')}<span>{$t("文件")}</span></Button.Root>
+ </nav>
+ {#if !web}
+  <div class="workspace-actions">
+   <Button.Root type="button" class="outline data-sources-entry" title={$t("数据源")} aria-label={$t("数据源")} onclick={()=>{settingsPage='imports';settingsOpen=true}}>{@html icon('plug')}</Button.Root>
+   <Button.Root type="button" class="outline web-clipper-entry" title={$t("网页剪藏")} aria-label={$t("网页剪藏")} onclick={()=>{settingsPage='clipper';settingsOpen=true}}>{@html icon('globe')}</Button.Root>
+   <Button.Root type="button" class="outline cli-entry" title="CLI" aria-label="CLI" onclick={()=>{settingsPage='cli';settingsOpen=true}}>{@html icon('codeBlock')}</Button.Root>
+  </div>
+ {/if}
+ </div>
+ {#if loadingDocument}<div class="document-loading" data-document-loading><span role="status">{$t('正在读取文件…')}</span><Button.Root type="button" onclick={nextDocumentReadRequest}>{$t('取消')}</Button.Root></div>{/if}
+ <div class="content" bind:this={workspaceContent}>
+ {#if loading}<div class="empty">{$t("正在打开本地知识库…")}</div>
+ {:else if startupError}<div class="empty startup-error"><p>{$t(web?"无法连接网页服务":"无法连接本地 SAG 服务")}</p><p class="startup-error-detail">{$t(startupError)}</p>{#if !web}<p class="startup-error-hint">{$t("如果旧版本的 SAG 服务仍在运行，请先在终端执行 super-sag service stop，然后重试。")}</p>{/if}<Button.Root class="primary" disabled={retrying} onclick={retryStartup}>{$t("重试")}</Button.Root></div>
+ {:else if view==='ask'}<div class="ask-layout"><section class="ask-content" class:ask-home={!shownMessages.length&&!pending} class:workspace-home={!shownMessages.length&&!pending} class:has-history={visibleConversations.length>0} use:rememberScroll={{key:helpMode?'sag.assistant.history.scroll':'sag.history.scroll',enabled:!loading&&!shownMessages.length&&!pending}}>{#if !shownMessages.length&&!pending}<div class="welcome"><WelcomeMark glyph="chat" enabled={welcomeMotionEnabled} chooseMotion={chooseWelcomeMotion}/><h1>{helpMode?$t("Super-SAG 助手"):roots.length?$t("向你的文件提问"):$t("你的文件，直接成为知识库。")}</h1>{#if helpMode}<p>{$t("只依据 Super-SAG 使用文档回答。")}</p>{:else if roots.length}<p>{$t("跨文件查找信息，随时查看原文。")}</p>{:else if web}<p>{$t("先创建文件夹，再上传文件或文件夹。")}</p><Button.Root class="primary add-folder-cta" onclick={add}>{@html icon('plus')}{$t("创建文件夹")}</Button.Root>{/if}{#if !helpMode&&settings&&!answerReady&&web}<p class="setup-hint" role="status">{$t("请联系管理员配置问答模型。")}</p>{:else if !helpMode&&settings&&answerReady&&!jevReady}<p class="setup-hint" role="status">{#if web}{$t("请联系管理员配置决策模型。配置前仍可使用快速搜索。")}{:else}{$t("未配置 Jev 时只能使用本地快速检索；深入检索与多跳问答需要先配置。")}<Button.Root class="settings-error-link" onclick={()=>{settingsPage="models";settingsOpen=true}}>{$t("前往设置")}</Button.Root>{/if}</p>{/if}</div>{:else}<div class="chat-log" bind:this={chatLog} use:followChat={[chatScrollKey,pending,renderedAnswers]}><div class="chat-messages">{#each displayedMessages as m,index}{@const rendered=renderedAnswers[answerKey(m)]}{@const events=answerEvents(m.tool_calls,m.reasoning_blocks)}<div class="user-turn">
+ {#if editingMessage===index}<form class="message-editor" on:submit|preventDefault={()=>regenerate(index,editingText.trim())}>
+ <Textarea aria-label={$t("编辑问题")} bind:ref={messageInput} bind:value={editingText} oncompositionstart={compositionStart} oncompositionend={compositionEnd} onkeyup={compositionKeyUp} onkeydown={(event:KeyboardEvent)=>{if(imeKey(event))return;if(event.key==='Escape'){editingMessage=null;event.preventDefault()}else if(event.key==='Enter'&&(event.metaKey||event.ctrlKey)){event.preventDefault();if(editingText.trim())void regenerate(index,editingText.trim())}}}/>
+ {#if index<displayedMessages.length-1}<p class="message-edit-note">{$t("重新发送将替换此轮及后续 {value0} 轮问答，可在完成后撤销。",{value0:displayedMessages.length-index-1})}</p>{/if}
+ <div class="message-editor-actions"><Button.Root type="button" class="outline" onclick={()=>editingMessage=null}>{$t("取消")}</Button.Root><Button.Root type="submit" class="primary" disabled={!editingText.trim()}>{$t("保存并发送")}</Button.Root></div>
+ </form>{:else}<div class="user-message">{m.question}</div><div class="message-actions user-actions" aria-label={$t("问题操作")}>
+ <Button.Root class="icon-button" title={$t("复制问题")} aria-label={$t("复制问题")} onclick={()=>copyMessage(m.question)}>{@html icon('copy')}</Button.Root>
+ <Button.Root class="icon-button" title={$t("编辑问题")} aria-label={$t("编辑问题")} disabled={busy} onclick={()=>beginEdit(index)}>{@html icon('edit')}</Button.Root>
+ <Button.Root class="icon-button" title={$t("删除此轮问答")} aria-label={$t("删除此轮问答")} disabled={busy||!conversation} onclick={()=>deleteMessage(index)}>{@html icon('delete')}</Button.Root>
+ </div>{/if}</div><article class="answer"><AnswerProcess hasContent={!!(events.length||m.reasoning)} answering={!!m.answer.slice(events.at(-1)?.offset??0).trim()} running={m===pending&&askBusy} startedAt={m.created_at} elapsedMs={m.context?.elapsed_ms}>{#if m.reasoning&&!m.reasoning_blocks?.length}<Reasoning content={m.reasoning} running={m===pending&&busy&&stage==='思考中'&&!m.answer}/>{/if}{#each events as event,i(`${event.kind}:${event.index}`)}{@const html=rendered?.events[i]?.html??escaped(m.answer.slice(event.from,event.offset)).replace(/\n/g,'<br>')}{#if html}<div class="answer-text" role="presentation" on:click={(e)=>{const target=(e.target as HTMLElement).closest<HTMLElement>('[data-citation]');if(target)source=m.evidence[Number(target.dataset.citation)]}} use:answerHtml={html}></div>{/if}{#if event.kind==='reasoning'}{@const block=m.reasoning_blocks![event.index]}<Reasoning content={block.content} running={event.index===m.reasoning_blocks!.length-1&&m===pending&&busy&&stage==='思考中'&&block.answer_offset===m.answer.length&&block.tool_count===(m.tool_calls?.length??0)}/>{:else if !joinsToolRun(m,events,i)}{@const run=toolRun(m,events,i)}<ToolGroup calls={run.map(j=>m.tool_calls![events[j].index])} states={run.map(j=>toolState(m,m.tool_calls![events[j].index],pending,activeToolId,busy))}>{#each run as j(j)}{@const call=m.tool_calls![events[j].index]}<ToolCall {call} state={toolState(m,call,pending,activeToolId,busy)} stage={m===pending&&activeToolId===call.id?searchStageText:''} scope={m.scope.length===0?$t("全部文件"):m.scope.map(basename).join('、')}/>{/each}</ToolGroup>{/if}{/each}{#if m===pending&&busy&&!activeToolId&&!(stage==='思考中'&&(m.reasoning_blocks?.length?m.reasoning_blocks.at(-1)!.answer_offset===m.answer.length&&m.reasoning_blocks.at(-1)!.tool_count===(m.tool_calls?.length??0):m.reasoning))}<div class="answer-progress" role="status"><span class="progress-indicator" aria-hidden="true"></span><span>{$t(stage)}</span></div>{/if}</AnswerProcess>{#if m.context?.summary_error}<div class="answer-notice" role="status"><span class="answer-notice-mark" aria-hidden="true">!</span><div><p>{$t("本次未能生成上下文摘要，已只保留最近一轮对话和本轮记录继续回答；更早的 {value0} 轮内容本次未参考。",{value0:m.context.omitted_history})}</p><details class="answer-notice-reason"><summary>{$t("查看原因")}</summary><pre>{$t(m.context.summary_error)}</pre></details></div></div>{/if}<div class="answer-text" role="presentation" on:click={(e)=>{const target=(e.target as HTMLElement).closest<HTMLElement>('[data-citation]');if(target)source=m.evidence[Number(target.dataset.citation)]}} use:answerHtml={rendered?.html??(answerRenderer?'':escaped(m.answer.slice(events.at(-1)?.offset??0)).replace(/\n/g,'<br>'))}></div>{#if m.status==='complete'&&!m.error&&!m.answer.slice(events.at(-1)?.offset??0).trim()&&m!==pending}<div class="answer-empty" role="status"><span class="answer-empty-mark" aria-hidden="true">×</span><span>{$t("本轮没有正文。检索结果仍保留在上方的处理过程中。")}{#if conversation&&!busy} <Button.Root class="answer-empty-action" onclick={()=>retryMessage(index)}>{$t("重新生成回答")}</Button.Root>{/if}</span></div>{/if}{#if m.error}<p class="form-error">{$t(m.error)}{#if isModelKeyError(m.error,"请在设置中填写问答模型 API 密钥")||m.error.includes("Jev")}<Button.Root class="settings-error-link" onclick={()=>{settingsPage="models";settingsOpen=true}}>{$t("前往设置")}</Button.Root>{/if}</p>{/if}{#if rendered?.sources.length}<div class="source-list">{#each rendered.sources as group}<Button.Root class="source-chip" onclick={()=>source=group.first}><small>{group.number}</small>{@html icon('file')}<span>{group.first.title}</span></Button.Root>{/each}</div>{/if}{#if m.context||m.created_at!=null}<div class="answer-context-reveal"><p class="answer-context">{#if m.context}{$t("{value0} 输入 tokens{value1} · ",{value0:compactNumber(m.context.input_tokens??m.context.estimated_input),value1:m.context.input_tokens===null?$t("（估算）"):''})}{#if m.context.output_tokens===null}{$t("输出 tokens 未返回")}{:else}{$t("{value0} 输出 tokens",{value0:compactNumber(m.context.output_tokens)})}{/if}{#if m.context.elapsed_ms!=null}{$t(" · 耗时 {value0}",{value0:durationLabel(m.context.elapsed_ms)})}{/if}{#if m.context.output_tokens!==null&&m.context.generation_ms} · {compactNumber(m.context.output_tokens*1000/m.context.generation_ms)} tokens/s{/if}{#if m.context.omitted_sources}{$t(" · 已略去 {value0} 个片段以满足预算",{value0:compactNumber(m.context.omitted_sources)})}{/if}{#if m.context.summary_error&&m.context.omitted_history}{$t(" · 已略去 {value0} 轮较早对话（本次未生成摘要）",{value0:m.context.omitted_history})}{/if}{/if}{#if m.created_at!=null}{#if m.context} · {/if}<Timestamp value={m.created_at}/>{/if}</p></div>{/if}{#if !m.tool_calls?.length&&m.retrieval_question!==m.question}<details class="trace"><summary>{$t("检索问题")}</summary>{m.retrieval_question}</details>{/if}
+ {#if m.answer||!busy}<div class="message-actions answer-actions" aria-label={$t("回答操作")}>
+ <Button.Root class="icon-button" title={$t("复制回答")} aria-label={$t("复制回答")} disabled={!m.answer} onclick={()=>copyMessage(m.answer)}>{@html icon('copy')}</Button.Root>
+ {#if !m.help}{#if m.note_path}<Button.Root class="icon-button note-saved" title={$t("已保存为笔记，点击打开")} aria-label={$t("打开笔记")} onclick={()=>openNote(m.note_path!)}>{@html icon('file')}</Button.Root>{:else}<Button.Root class="icon-button" title={$t("保存为笔记")} aria-label={$t("保存为笔记")} disabled={busy||!conversation||m.status!=='complete'||!m.answer.trim()} onclick={(event:MouseEvent)=>saveNote(index,event.altKey)}>{@html icon('download')}</Button.Root>{/if}{/if}
+ <Button.Root class="icon-button" title={$t("重新生成回答")} aria-label={$t("重新生成回答")} disabled={busy} onclick={()=>retryMessage(index)}>{@html icon('refresh')}</Button.Root>
+ <Button.Root class="icon-button" title={$t("删除此轮问答")} aria-label={$t("删除此轮问答")} disabled={busy||!conversation} onclick={()=>deleteMessage(index)}>{@html icon('delete')}</Button.Root>
+ 
+ </div>{/if}</article>{/each}</div></div>{/if}
+ <div class="composer-wrap"><Popover.Root bind:open={mention}><Popover.Portal to=".real-client"><Popover.Content class="mention-picker" customAnchor={composer} collisionBoundary={workspaceContent} side={mentionSide} sideOffset={6} collisionPadding={8} align="start" trapFocus={false} onOpenAutoFocus={event=>event.preventDefault()} onCloseAutoFocus={event=>event.preventDefault()}><div class="mention-heading">{$t("@ 引用文件")}</div>{#if !files.length}<div class="mention-empty" aria-live="polite">{@html icon('folder')}<strong>{$t('知识库还没有可引用的文件')}</strong><p>{$t('添加文件夹并完成索引后，就可以用 @ 选择要引用的文件。')}</p><Button.Root type="button" class="outline mention-add-folder" onclick={()=>{mention=false;add()}}>{@html icon('plus')}{$t('添加文件夹')}</Button.Root></div>{:else if !mentions.length}<div class="mention-empty" aria-live="polite">{@html icon('search')}<strong>{$t('没有匹配的文件')}</strong><p>{$t('试试其他文件名或路径关键词。')}</p></div>{:else}<div class="mention-options" role="listbox" aria-label={$t("引用文件")}>{#each mentions as f,i}<Button.Root role="option" aria-selected={i===mentionIndex} onmousedown={(event:MouseEvent)=>{event.preventDefault();(()=>reference(f.path))();}}>{@html icon('file')}<span><strong>{f.name}</strong><small>{displayPath(f.path)}</small></span></Button.Root>{/each}</div><div class="mention-help">{$t("↑ ↓ 选择 · Enter 引用 · Esc 关闭")}</div>{/if}</Popover.Content></Popover.Portal></Popover.Root><form class="composer" class:busy bind:this={composer} use:mentionPlacement on:submit|preventDefault={()=>run('ask')}><div class="reference-chips">{#each references as path}<span class="reference-chip">{@html icon('file')}<span>{basename(path)}</span><Button.Root type="button" aria-label={$t("移除引用 {value0}",{value0:basename(path)})} onclick={()=>references=references.filter(p=>p!==path)}>{@html icon('close')}</Button.Root></span>{/each}</div><Textarea aria-label={helpMode?$t("询问 Super-SAG 用法"):$t("向你的文件提问")} bind:ref={askInput} bind:value={ask} oninput={mentionUpdate} onkeydown={askKey} onkeyup={compositionKeyUp} oncompositionstart={compositionStart} oncompositionend={compositionEnd} placeholder={busy?$t("回答生成中，可以先输入下一个问题…"):helpMode?(helpSuggestion||$t("询问 Super-SAG 用法…")):$t("向你的文件提问，输入 @ 引用文件…")}/><div class="composer-bottom"><div class="composer-options">{#if helpMode}<span class="scope-button help-scope">{@html icon('file')}<span>{$t("Super-SAG 使用文档")}</span></span>{:else}<Button.Root class="scope-button" type="button" aria-haspopup="dialog" aria-expanded={scopeOpen} onclick={scopeShow}>{@html icon(scope.length?'folder':'globe')}<span>{scopeLabel}</span>{@html icon('down')}</Button.Root>{/if}</div><div class="composer-model-controls">{#if settings&&!web&&!answerReady}<Button.Root type="button" class="primary quick-setup-action" onclick={openQuickSetup}>{$t("快速配置")}</Button.Root>{:else if settings}<ContextUsage context={busy?pending?.context:conversation?.messages.at(-1)?.context} limit={settings.answer_context_tokens??65536} loading={busy&&!pending?.context}/><ReasoningControl model={settings.answer.model} models={settings.answer.models} onModelChange={model=>{if(settings)settings={...settings,answer:{...settings.answer,model}}}} endpoint={settings.answer.url} value={settings.model_profiles?.[settings.answer.model]?.reasoning_effort} disabled={busy} onChange={setReasoning} onCommit={saveReasoning}/>{/if}{#if busy}<Button.Root type="button" class="send" aria-label={$t("停止生成")} onclick={()=>stop()}>{@html icon('stop')}</Button.Root>{:else}<Button.Root type="submit" class="send" aria-label={$t("发送问题")} disabled={!ask.trim()&&!helpSuggestion}>{@html icon('arrow')}</Button.Root>{/if}</div></div></form>{#if !shownMessages.length&&!pending}<div class="help-entry"><Button.Root type="button" class="outline" disabled={askBusy||!!cancellingAsk} onclick={()=>newChat(!helpMode)}>{@html icon(helpMode?'back':'help')}<span>{helpMode?$t("切回我的文件"):$t("Super-SAG 助手")}</span>{#if !helpMode}{@html icon('chevron')}{/if}</Button.Root></div>{/if}</div>{#if !shownMessages.length&&!pending&&visibleConversations.length}<section class="recent-conversations" aria-label={$t("会话列表")}><div class="recent-heading"><span>{$t("会话列表")}</span><Button.Root class="icon-button" title={$t("搜索会话")} aria-label={$t("搜索会话")} onclick={()=>historySearchOpen=true}>{@html icon('search')}</Button.Root></div><div class="recent-list">{#each visibleConversations as c(c.id)}<div class="history-row" class:active={view==='ask'&&conversation?.id===c.id}><Button.Root class="conversation-item" title={c.title} onclick={()=>chooseHistory(c)}>{@html icon('chat')}<span>{c.title}</span></Button.Root><Timestamp value={c.updated}/><Button.Root class="history-more" aria-label={$t("{value0} 的选项",{value0:c.title})} onclick={(e:MouseEvent)=>chatMenu(e,c)}>{@html icon('more')}</Button.Root></div>{:else}<p class="history-empty">{$t("还没有问答记录")}</p>{/each}</div></section>{/if}</section></div>
+ {:else if view==='search'}<section class="search-page" class:workspace-home={!searched} class:has-results={searched} aria-busy={busy}>{#if !searched}<div class="welcome search-welcome"><WelcomeMark glyph="search" enabled={welcomeMotionEnabled} chooseMotion={chooseWelcomeMotion}/><h1>{$t("搜索你的文件")}</h1><p>{$t("查找文件内容，随时查看原文。")}</p></div>{/if}<div class="search-query-row"><form class="search-composer" class:compact={searched} on:submit|preventDefault={()=>run(searchMode)}><div class="search-entry"><Input aria-label={$t("搜索关键词")} bind:ref={searchInput} bind:value={search} onkeydown={searchKey} onkeyup={compositionKeyUp} oncompositionstart={compositionStart} oncompositionend={compositionEnd} placeholder={$t("输入关键词或问题，搜索你的文件…")}/></div><div class="search-composer-bottom"><Button.Root class="scope-button" type="button" aria-haspopup="dialog" aria-expanded={scopeOpen} onclick={scopeShow}>{@html icon(scope.length?'folder':'globe')}<span>{scopeLabel}</span>{@html icon('down')}</Button.Root><div class="search-composer-actions"><Select class="search-mode" label={$t("搜索模式")} value={searchMode} onValueChange={changeSearchMode} disabled={busy} items={[{value:"deep_search",label:jevReady?$t("深入"):$t("深入（需配置 Jev）")},{value:"search",label:$t("快速")}]}/>{#if busy}<Button.Root type="button" class="send" aria-label={$t("停止搜索")} onclick={()=>stop()}>{@html icon('stop')}</Button.Root>{:else}<Button.Root class="send" aria-label={$t("搜索文件")} disabled={!search.trim()}>{@html icon('arrow')}</Button.Root>{/if}</div></div></form></div>
+ {#if !searched&&!quickSearchHintDismissed&&quickSearchConfiguration?.preferences?.enabled&&!quickSearchConfiguration.error}<p class="quick-search-hint"><kbd>{shortcutLabel(quickSearchConfiguration.preferences.shortcut)}</kbd><span>{$t("打开快捷搜索")}</span><Button.Root type="button" class="quick-search-hint-close" aria-label={$t('关闭快捷搜索提示')} onclick={()=>{quickSearchHintDismissed=true;localStorage.setItem('sag.quick-search-hint.dismissed','1')}}>{@html icon('close')}</Button.Root></p>{/if}
+ {#if !searched&&searchHistory.length}<section class="search-history" aria-label={$t("最近搜索")}><div class="search-history-heading"><span>{$t("最近搜索")}</span><Button.Root class="icon-button" aria-label={$t("清空搜索历史")} title={$t("清空搜索历史")} onclick={clearSearchHistory}>{@html icon('delete')}</Button.Root></div><div class="search-history-items">{#each searchHistory as question}<Button.Root class="search-history-item" title={question} onclick={()=>{search=question;void run(searchMode)}}>{@html icon('search')}<span>{question}</span></Button.Root>{/each}</div></section>{/if}{#if searched}
+ <div class="search-options-row"><div class="search-summary"><span aria-live="polite">{searchStopped?$t("已停止搜索 · "):''}{busy&&!paging?$t(searchJobKind==='deep_search'?"深入搜索中":"快速搜索中"):`${searchRanked?$t("深入搜索"):$t("快速搜索")} · ${$t("{value0} 个文件",{value0:searchPagination?.total??groups.length})}`}{#if searchElapsed!==null&&!(busy&&!paging)}{' · '}{searchElapsed<1000?`${searchElapsed} ms`:$t("{value0} 秒",{value0:(searchElapsed/1000).toFixed(1)})}{/if}</span></div><div class="search-options-actions">{#if showSummary}<Button.Root class="search-summary-toggle" aria-label={$t('搜索总结')} aria-pressed={summarySelected} onclick={toggleSearchSummary}>{@html icon('chat')}<span>{$t('搜索总结')}</span>{#if summaryBusy}<span class="summary-running" aria-hidden="true"></span>{/if}</Button.Root>{/if}</div></div>
+ {#if searchError}<p class="form-error" role="alert">{$t(searchError)}{#if isModelKeyError(searchError,"请在设置中填写 Jev API 密钥")}<Button.Root class="settings-error-link" onclick={()=>{settingsPage="jev";settingsOpen=true}}>{$t("前往设置")}</Button.Root>{/if}</p>{/if}{#if busy&&!paging}
+ <div class="search-loading" role="status" aria-live="polite" aria-atomic="true"><div class="search-skeleton" aria-hidden="true">{#each [0,1,2,3] as row}<span style={`--row:${row}`}></span>{/each}</div><strong>{searchStageText}</strong></div>
+ {:else if groups.length}
+ <div class="search-layout" class:is-paging={paging} class:reading={!!focus||summarySelected} class:focus-mode={searchFocusMode} inert={paging} style={`--search-list-width:${searchListWidth}px`}>
+  <section class="search-results-column" aria-label={$t("相关文件")}><header class="search-results-heading"><strong>{$t("相关文件")}</strong></header><div class="search-results" use:quietScroll bind:this={searchList} role="listbox" tabindex="0" aria-label={$t("搜索结果")} aria-activedescendant={groups[activeResult]?`search-result-${activeResult}`:undefined} on:keydown={resultKeys} on:focus={()=>resultsFocused=true} on:blur={()=>resultsFocused=false}>
+   {#each groups as g,i (g.first.path)}<SearchResultItem group={g} id={`search-result-${i}`} terms={searchTerms} {roots} selected={focus?.path===g.first.path} active={activeResult===i&&resultsFocused} focused={focus} cited={summaryCitations.get(g.first.path)??[]} expanded={passagesOpen&&focus?.path===g.first.path} onSelect={c=>{activeResult=i;closePassages(false);void focusResult(c,true)}} onToggle={()=>togglePassages(g.first.path)} onFocus={()=>activeResult=i}/>{/each}
+  </div></section>
+  <!-- A focusable separator with a value is the ARIA splitter widget. -->
+  <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
+  <div class="search-resizer" role="separator" tabindex="0" aria-orientation="vertical" aria-label={$t("调整结果列表宽度")} aria-valuemin={260} aria-valuemax={520} aria-valuenow={searchListWidth} on:pointerdown={startResize} on:keydown={resizeKey}></div>
+  <article class="search-preview" class:showing-summary={!focus} class:search-finding={previewFindOpen}>
+   {#if focus}
+    <div class="search-preview-head">
+     {#if showSummary}<Button.Root class="icon-button search-preview-back summary-only" aria-label={$t("返回搜索总结")} title={$t("返回搜索总结")} onclick={toggleSearchSummary}>{@html icon('back')}</Button.Root>{/if}
+     <Button.Root class="icon-button search-preview-back list-only" aria-label={$t("返回结果列表")} title={$t("返回结果列表")} onclick={leaveSearchReader}>{@html icon('back')}</Button.Root>
+     <div class="search-preview-title"><strong title={sourceName(focus)}>{sourceName(focus)}</strong><span class="source-path" title={displayPath(indexedSourcePath(focus.path,focus.source_path))}>{sourceFolder(focus.path,roots,focus.source_path)}</span></div>
+     <div class="search-preview-actions">
+      <div class="search-passage-nav" role="group" aria-label={$t('相关片段')}>
+       <Button.Root class="search-passage-trigger" aria-expanded={passagesOpen} aria-controls="search-passage-picker" title={$t('选择相关片段')} onclick={()=>togglePassages(focus!.path)}>{@html icon('bulletList')}<span>{$t('相关片段')}</span><b>{passageIndex+1} / {focusedPassages.length}</b>{@html icon('down')}</Button.Root>
+       <Button.Root class="icon-button search-passage-step search-passage-previous" aria-label={$t('上一个片段')} title={$t('上一个片段')} disabled={passageIndex<=0} onclick={()=>stepPassage(-1)}>{@html icon('chevron')}</Button.Root>
+       <Button.Root class="icon-button search-passage-step search-passage-next" aria-label={$t('下一个片段')} title={$t('下一个片段')} disabled={passageIndex>=focusedPassages.length-1} onclick={()=>stepPassage(1)}>{@html icon('chevron')}</Button.Root>
+      </div>
+      <Button.Root class="icon-button search-find-trigger" aria-label={$t('在文档中查找')} title={$t('在文档中查找')} aria-expanded={previewFindOpen} onclick={()=>previewFindOpen?closePreviewFind():openPreviewFind()}>{@html icon('search')}</Button.Root>
+      <Button.Root class="icon-button search-focus-toggle" aria-label={$t(searchFocusMode?'退出专注阅读':'进入专注阅读')} title={$t(searchFocusMode?'退出专注阅读':'进入专注阅读')} aria-pressed={searchFocusMode} onclick={()=>{closePassages(false);searchFocusMode=!searchFocusMode}}>{@html icon(searchFocusMode?'panel':'maximize')}</Button.Root>
+      {#if !web}<Popover.Root><Popover.Trigger class="icon-button" aria-label={$t('文档操作')} title={$t('文档操作')}>{@html icon('more')}</Popover.Trigger><Popover.Portal><Popover.Content class="search-document-menu" side="bottom" align="end" sideOffset={8} collisionPadding={12}><p>{displayPath(indexedSourcePath(focus.path,focus.source_path))}</p><Button.Root onclick={()=>api('reveal_path',{path:indexedSourcePath(focus!.path,focus!.source_path)}).catch(e=>notify($t(String(e))))}>{$t('在文件夹中显示')}</Button.Root><Button.Root onclick={()=>edit(focus!.path,searchTerms)}>{$t('打开文档')}</Button.Root>{#if focus.source_path}<Button.Root onclick={()=>api('open_source_file',{path:focus!.source_path}).catch(e=>notify($t(String(e))))}>{$t('打开原文件')}</Button.Root>{/if}</Popover.Content></Popover.Portal></Popover.Root>{/if}
+      <Button.Root class="search-open-document" onclick={()=>edit(focus!.path,searchTerms)}>{$t('打开文档')}</Button.Root>
+     </div>
+    </div>
+    {#if previewFindOpen}<form class="search-find-bar" on:submit|preventDefault={applyPreviewFind}><label for="preview-find">{$t('正文查找')}</label><input id="preview-find" bind:this={previewFindInput} bind:value={previewFindDraft} placeholder={$t('输入词语，按 Enter 查找')}/><Button.Root type="submit">{$t('查找')}</Button.Root><Button.Root type="button" class="icon-button" aria-label={$t('关闭正文查找')} onclick={closePreviewFind}>{@html icon('close')}</Button.Root></form>{/if}
+    {#if previewError}<p class="small muted search-preview-note" role="status">{previewError}</p>{/if}
+    {#if previewLoading}<div class="search-preview-loading" role="status"><span class="search-skeleton" aria-hidden="true">{#each [0,1,2] as row}<span style={`--row:${row}`}></span>{/each}</span><span class="sr-only">{$t("正在读取文件…")}</span></div>{:else if previewDocument}
+     {#key `${previewRequest}:${previewFindOpen}:${previewFindTerm}`}
+      {#if isLargeMarkdown(previewDocument)&&LargeReader}<svelte:component this={LargeReader} doc={previewDocument} candidate={previewFindTerm?null:focus} deriveTerms={!previewFindOpen} terms={readerTerms} showNavigation={previewFindOpen} explicitFind={!!previewFindTerm} memoryKey={readerMemoryKey} restoreScroll={restorePreview} trace={previewTrace}/>
+      {:else if isHtml(focus.path)}<HtmlDocument paragraphHighlight body={previewDocument.body} terms={readerTerms} initialMatch={previewFindTerm?0:previewInitialMatch} showNavigation={previewFindOpen} memoryKey={readerMemoryKey} restoreScroll={restorePreview}/>
+      {:else if previewReader?.doc===previewDocument}<svelte:component this={previewReader.Reader} model={previewReader.model} terms={readerTerms} target={previewFindTerm?0:previewReader.target} path={displayPath(focus.path)} showNavigation={previewFindOpen} memoryKey={readerMemoryKey} restoreScroll={restorePreview}/>
+      {:else}<HighlightedDocument html={preview} terms={readerTerms} path={displayPath(focus.path)} initialMatch={previewFindTerm?0:previewInitialMatch} showNavigation={previewFindOpen} memoryKey={readerMemoryKey} restoreScroll={restorePreview}/>{/if}
+     {/key}
+    {/if}
+    {#if passagesOpen}{#key focus.path}<SearchPassagePicker candidates={focusedPassages} selectedId={focus.id} terms={searchTerms} onSelect={selectPassage} onClose={()=>closePassages()}/>{/key}{/if}
+   {:else if summarySelected&&showSummary}
+    <div class="search-summary-scroll" use:quietScroll><SearchSummary text={summaryText} rendered={renderedSummary} running={summaryBusy} error={summaryError} evidence={summaryEvidence} context={summaryContext} onSource={candidate=>{closePassages(false);void focusResult(candidate)}} onCopy={copyMessage} onBack={leaveSearchReader}/></div>
+   {:else}<div class="search-preview-empty">{@html icon('file')}<p>{$t("选择左侧的结果查看原文。")}</p></div>{/if}
+  </article>
+ </div>
+{#if searchPagination&&searchPagination.total>searchPagination.page_size}
+ <div class="search-pagination-footer">
+  <span class="search-page-range" aria-live="polite">{paging?$t("正在翻页…"):$t("第 {value0}–{value1} 个，共 {value2} 个文件",{value0:(searchPagination.page-1)*searchPagination.page_size+1,value1:Math.min(searchPagination.page*searchPagination.page_size,searchPagination.total),value2:searchPagination.total})}</span>
+  <Pagination.Root class="search-pagination" role="navigation" aria-label={$t("搜索结果分页")} count={searchPagination.total} perPage={searchPagination.page_size} bind:page={searchPage} onPageChange={changeSearchPage} siblingCount={1}>
+   {#snippet children({pages})}
+    <Pagination.PrevButton class="page-button" disabled={busy} aria-label={$t("上一页")}>{@html icon('back')}</Pagination.PrevButton>
+    {#each pages as page (page.key)}
+     {#if page.type==='ellipsis'}<span class="page-ellipsis" aria-hidden="true">…</span>
+     {:else}<Pagination.Page class="page-button" {page} disabled={busy}>
+      {#snippet child({props})}<button {...props} disabled={busy} aria-label={$t("前往第 {value0} 页",{value0:page.value})} aria-current={searchPage===page.value?'page':undefined}>{page.value}</button>{/snippet}
+     </Pagination.Page>{/if}
+    {/each}
+    <Pagination.NextButton class="page-button page-next" disabled={busy} aria-label={$t("下一页")}>{@html icon('back')}</Pagination.NextButton>
+   {/snippet}
+  </Pagination.Root>
+ </div>
+{/if}
+{:else if !busy}<div class="search-empty">{@html icon('search')}<h2>{searchStopped?$t("已停止搜索"):searchError?$t("搜索未完成"):$t("没有找到相关文件")}</h2><p>{searchStopped?$t("可以重新搜索，或调整范围。"):searchError?$t("可以重试搜索，或切换搜索模式。"):$t("换一个关键词，或调整查询范围。")}</p><Button.Root class="outline" onclick={scopeShow}>{$t("选择范围")}</Button.Root></div>{/if}{/if}</section>
+ {:else if view==='files'&&librarySessions[selected]}{#key selected}<LibraryWorkspace onBlankMenu={web?undefined:showBlankFileMenu} showIndexDetails={settings?.show_index_details??false} {conversionStates} {indexTasks} {indexPaused} scope={displayPath(selected)} parent={libraryParent} session={librarySessions[selected]} onModeChange={()=>librarySessions={...librarySessions}} entries={directoryEntries} totalFiles={files.length} indexedFiles={files} notes={noteSummaries} {roots} onIndexDetails={()=>indexDetailsOpen=true} onPauseChange={indexPauseChanged} oncreate={!web||roots.length?()=>create():undefined} onadd={web?undefined:add} webFolder={web&&webLibrary?{path:selected,canUpload:!!selected&&inside(selected,webLibrary)}:undefined} bind:creatingWebFolder onWebFolderCreated={openCreatedFolder} onWebUploaded={()=>refresh().catch(error=>notify($t(String(error))))} reading={!!selected&&readingFolder===selected} revision={libraryRevision} onbrowse={libraryBrowse} onopen={(path,terms)=>edit(path,terms,selected)} onmenu={showMenu} onSettings={()=>{settingsPage='files';settingsOpen=true}}/>{/key}
+ {:else if view==='document'&&readOnlyDoc&&isLargeMarkdown(readOnlyDoc)&&LargeReader}
+  <section class="readonly-document large-document">
+   <div class="editor-head">
+    <Button.Root class="icon-button" title={$t(documentFromConversation?'返回会话':documentFromSearch?'返回搜索':'返回文件夹')} onclick={returnToFiles}>{@html icon('back')}</Button.Root>
+    <span title={readOnlyDoc.source_path??readOnlyDoc.path}>{readOnlyDoc.name}</span>
+    {#if !web&&readOnlyDoc.source_path}<Button.Root class="outline small" onclick={()=>api('open_source_file',{path:readOnlyDoc!.source_path}).catch(e=>notify($t(String(e))))}>{$t('打开原文件')}</Button.Root>{/if}
+    <Button.Root class="outline edit-large-document" onclick={editLargeDocument}>{$t('编辑文档')}</Button.Root>
+   </div>
+   {#if noteDetail&&noteDetail.summary.path===readOnlyDoc.path}<NoteStatus note={noteDetail} checking={noteChecking} onRecheck={recheckNote} onOpenSource={openNoteSource} onReask={reaskNote}/>{/if}
+   {#key documentReadSession}
+    {#key readOnlyDoc.path}
+     <svelte:component this={LargeReader} doc={readOnlyDoc} terms={documentSearchTerms} candidate={largeCandidate} deriveTerms={!!largeCandidate&&!documentSearchTerms.length} onTerms={value=>documentSearchTerms=value} showFind memoryKey="library" restoreScroll={restoreDocumentScroll} trace={documentTrace}/>
+    {/key}
+    <DocumentQuestion name={readOnlyDoc.name} onAsk={askDocument}/>
+   {/key}
+  </section>
+ {:else if view==='document'&&readOnlyDoc}<section class="readonly-document"><div class="editor-head"><Button.Root class="icon-button" title={$t(documentFromConversation?"返回会话":documentFromSearch?"返回搜索":"返回文件夹")} onclick={returnToFiles}>{@html icon('back')}</Button.Root><span>{readOnlyDoc.name}</span><span class="document-status">{#if isRtf(readOnlyDoc.path)}{$t("RTF 正文")} · {/if}{$t("只读")}</span><Button.Root class="outline" onclick={()=>api('reveal_path',{path:readOnlyDoc!.path}).catch(e=>notify($t(String(e))))}>{mac?$t("在 Finder 中打开"):$t("在文件资源管理器中打开")}</Button.Root></div><div class="source-path">{displayPath(readOnlyDoc.path)}</div>{#if isHtml(readOnlyDoc.path)}<HtmlDocument body={readOnlyDoc.body} terms={documentSearchTerms} initialMatch={documentInitialMatch}/>{:else}<HighlightedDocument html={readonlyHtml(readOnlyDoc.path,readOnlyDoc.body)} terms={documentSearchTerms} initialMatch={documentInitialMatch}/>{/if}{#key readOnlyDoc.path}<DocumentQuestion name={readOnlyDoc.name} onAsk={askDocument}/>{/key}</section>
+ {:else if view==='editor'&&draft}<section class="editor wysiwyg-editor"><div class="editor-head"><div class="editor-location"><Button.Root class="icon-button" title={$t(documentFromConversation?"返回会话":documentFromSearch?"返回搜索":"返回文件夹")} onclick={returnToFiles}>{@html icon('back')}</Button.Root>{#if selected}<Popover.Root><Popover.Trigger type="button" class="scope-info" title={displayPath(selected)} aria-label={$t("文件夹路径")}>{@html icon('folder')}<span>{basename(selected)}</span></Popover.Trigger><Popover.Portal><Popover.Content class="document-folder-path" aria-label={$t("文件夹路径")} side="bottom" align="start" sideOffset={8} collisionPadding={12}>{displayPath(selected)}</Popover.Content></Popover.Portal></Popover.Root>{/if}</div><div class="document-name-wrap"><Input class="document-name" aria-label={$t("文件名")} title={draft.name} bind:value={draft.name} readonly={!draft.is_new} oninput={()=>dirty=true}/></div><div class="editor-save-actions">{#if !web&&draft.source_path}<Button.Root type="button" class="outline small" onclick={()=>api('open_source_file',{path:draft!.source_path}).catch(e=>notify($t(String(e))))}>{$t('打开原文件')}</Button.Root>{/if}<span class="document-status">{dirty?$t("未保存"):draft.is_new?'':$t("已保存")}</span><Button.Root class="primary small" disabled={saving} onclick={save}>{$t("保存")}</Button.Root></div></div>{#if noteDetail&&noteDetail.summary.path===draft.path}<NoteStatus note={noteDetail} checking={noteChecking} onRecheck={recheckNote} onOpenSource={openNoteSource} onReask={reaskNote}/>{/if}{#if EditorComponent}{#key draft.path}<svelte:component this={EditorComponent} body={draft.body} path={draft.path} searchTerms={documentSearchTerms} initialMatch={documentInitialMatch} performanceTrace={documentTrace} onChange={changed}/>{/key}{/if}{#key draft.path}<DocumentQuestion name={draft.name} onAsk={askDocument}/>{/key}<div class="editor-footer">{draft.is_new?$t("保存后才创建文件并加入知识库。"):$t("修改后点击保存。")}</div></section>{/if}
+ {#if error&&view!=='search'&&!answerHasError}<p class="form-error">{$t(error)}</p>{/if}
+ </div></main></div></div>
+{#if menu}<ActionMenu {menu} onClose={()=>menu=null}/>{/if}
+{#if removeFolderPath}<Modal label={$t("移除文件夹")} onClose={()=>{if(!removingFolder)removeFolderPath=''}}><div class="dialog-head"><h2>{$t("移除文件夹")}</h2></div><div class="dialog-body"><p>{$t("确定移除「{value0}」及其索引吗？",{value0:basename(removeFolderPath)})}</p><p class="small muted" style="overflow-wrap:anywhere">{displayPath(removeFolderPath)}</p><p>{$t("本地原文件和会话记录会保留，之后可重新添加文件夹。")}</p>{#if removeFolderError}<p class="form-error" role="alert">{removeFolderError}</p>{/if}</div><div class="dialog-footer"><Button.Root type="button" aria-label={$t("取消移除文件夹")} disabled={removingFolder} onclick={()=>removeFolderPath=''}>{$t("取消")}</Button.Root><Button.Root type="button" class="primary" aria-label={$t("确认移除文件夹")} disabled={removingFolder} onclick={confirmRemoveFolder}>{$t(removingFolder?"正在移除…":"确认移除")}</Button.Root></div></Modal>{/if}
+{#if scopeOpen}<Modal label={$t("选择查询范围")} class="scope-dialog" onClose={()=>scopeOpen=false}><div class="dialog-head"><h2>{$t("选择查询范围")}</h2><Button.Root class="icon-button" aria-label={$t("关闭")} onclick={()=>scopeOpen=false}>{@html icon('close')}</Button.Root></div><div class="dialog-body"><p>{$t("选中的文件夹包含全部子文件夹。")}</p><Button.Root class="scope-all" aria-pressed={!scopeDraft.length} onclick={()=>scopeDraft=[]}>{@html icon('globe')}<span>{$t("全部文件")}</span>{#if !scopeDraft.length}{@html icon('check')}{/if}</Button.Root><div class="scope-tree"><Tree nodes={roots} expanded={scopeExpanded} {cache} mode="scope" checked={scopeDraft} ontoggle={(path)=>toggle(path,true).catch(e=>notify($t(String(e))))} oncheck={scopeCheck}/></div></div><div class="dialog-footer"><Button.Root onclick={()=>scopeOpen=false}>{$t("取消")}</Button.Root><Button.Root class="primary" onclick={applyScope}>{$t("应用")}</Button.Root></div></Modal>{/if}
+{#if indexDetailsOpen}<IndexDetails {roots} onClose={()=>indexDetailsOpen=false} onPauseChange={indexPauseChanged}/>{/if}
+{#if settingsOpen&&settings}<SettingsPanel onShareReceived={path=>{void sharedReceived(path).catch(e=>notify($t(String(e))))}} onChatImported={refresh} onOpenImportedFolder={openImportedFolder} {narrowLayout} onBeforeUpdate={protect} onIndexHistory={()=>indexDetailsOpen=true} onDataCleared={clearAllDataState} onFoldersRemoved={clearFoldersState} onConversationsCleared={clearConversationState} value={settings} initial={settingsPage} onClose={()=>settingsOpen=false} onSave={saveSettings} onSaved={()=>notify($t("设置已保存"))} onShowGuide={()=>{settingsOpen=false;onboardingOpen=true}}/>{/if}
+{#if renameId}<Modal label={$t("重命名问答")} onClose={()=>renameId=''}><form on:submit|preventDefault={rename}><div class="dialog-head"><h2>{$t("重命名问答")}</h2></div><div class="dialog-body"><Input data-autofocus aria-label={$t("问答名称")} bind:value={renameTitle} required/>{#if renameError}<p class="form-error" role="alert">{renameError}</p>{/if}</div><div class="dialog-footer"><Button.Root type="button" onclick={()=>renameId=''}>{$t("取消")}</Button.Root><Button.Root class="primary" disabled={renaming||!renameTitle.trim()}>{$t("保存")}</Button.Root></div></form></Modal>{/if}
+{#if leave&&!saving}<Modal label={$t("保存文档")} onClose={()=>{void leaveChoice('cancel')}}><div class="dialog-head"><h2>{$t("保存文档？")}</h2></div><div class="dialog-body"><p>{$t("「{value0}」还有未保存内容。",{value0:draft?.name})}</p></div><div class="dialog-footer"><Button.Root onclick={()=>leaveChoice('cancel')}>{$t("取消")}</Button.Root><Button.Root onclick={()=>leaveChoice('discard')}>{$t("不保存")}</Button.Root><Button.Root class="primary" onclick={()=>leaveChoice('save')}>{$t("保存")}</Button.Root></div></Modal>{/if}
+{#if source}<Modal label={$t("引用原文")} drawer onClose={()=>source=null}><div class="context-top"><span class="citation-mark" aria-hidden="true">{@html icon('file')}</span><div class="citation-heading"><span class="citation-title" title={source.title}>{citationName(source)}</span><span class="source-path" title={isHelpDocument(source.path)?source.heading:source.path} dir="rtl"><bdi dir="ltr">{isHelpDocument(source.path)?(source.heading||$t("Super-SAG 使用文档")):source.path}</bdi></span></div><Button.Root class="icon-button citation-close" aria-label={$t("关闭引用")} onclick={()=>source=null}>{@html icon('close')}</Button.Root></div><CitationDocument {source} onOpen={terms=>edit(source!.path,terms,'',source!)}/></Modal>{/if}
+<svelte:document on:visibilitychange={scheduleNotice} on:click={externalLinkClick}/>
+{#if toast}<div id="notice" role="status" style:display="flex" on:mouseenter={()=>clearTimeout(noticeTimer)} on:mouseleave={scheduleNotice} on:focusin={()=>clearTimeout(noticeTimer)} on:focusout={()=>queueMicrotask(scheduleNotice)}><span>{$t(toast)}</span>{#if undo}<Button.Root onclick={()=>undo?.()}>{$t("恢复")}</Button.Root>{/if}<Button.Root aria-label={$t("关闭提示")} onclick={closeNotice}>{@html icon('close')}</Button.Root></div>{/if}
+
+{#if retryIndex!==null}<Modal label={$t("重新生成回答")} onClose={()=>retryIndex=null}><form on:submit|preventDefault={()=>regenerate(retryIndex!,displayedMessages[retryIndex!].question)}><div class="dialog-head"><h2>{$t("重新生成回答")}</h2></div><div class="dialog-body"><p>{$t("此轮及后续 {value0} 轮问答将被替换。完成后可以撤销，恢复原问答。",{value0:displayedMessages.length-retryIndex-1})}</p></div><div class="dialog-actions"><Button.Root type="button" class="outline" onclick={()=>retryIndex=null}>{$t("取消")}</Button.Root><Button.Root type="submit" class="primary">{$t("重新生成")}</Button.Root></div></form></Modal>{/if}
+
+{#if toolApproval}<Modal label={$t("确认 MCP 工具调用")} onClose={()=>answerApproval(false)}><div class="dialog-head"><h2>{$t("确认工具调用")}</h2></div><div class="dialog-body"><p><strong>{toolApproval.server_name}</strong> · {toolApproval.tool_name}</p><pre class="tool-approval-arguments">{JSON.stringify(toolApproval.arguments,null,2)}</pre><p class="small muted">{$t("只有允许后才会执行本次调用。")}</p></div><div class="dialog-footer"><Button.Root onclick={()=>answerApproval(false)}>{$t("拒绝")}</Button.Root><Button.Root class="primary" onclick={()=>answerApproval(true)}>{$t("允许本次")}</Button.Root></div></Modal>{/if}
+
+{#if historySearchOpen}<HistorySearch conversations={visibleConversations} onClose={()=>historySearchOpen=false} onSelect={async c=>{await chooseHistory(c);if(conversation?.id===c.id)historySearchOpen=false}}/>{/if}
+{#if onboardingOpen}<Onboarding onClose={closeOnboarding} onQuickSetup={!web&&!answerReady?()=>{closeOnboarding();openQuickSetup()}:undefined}/>{/if}
+{#if quickSetupOpen&&settings&&!web}<QuickSetup {settings} onSave={saveSettings} onSaved={()=>notify($t('快速配置已完成'))} onClose={()=>quickSetupOpen=false} onManual={()=>{quickSetupOpen=false;settingsPage='models';settingsOpen=true}}/>{/if}
+
+{#if saveNoteFor&&conversation&&displayedMessages[saveNoteFor.index]}<SaveNoteDialog message={displayedMessages[saveNoteFor.index]} conversationId={conversation.id} messageIndex={saveNoteFor.index} {roots} {cache} defaultFolder={settings?.notes?.folder} onClose={()=>saveNoteFor=null} onAddFolder={()=>{saveNoteFor=null;add()}} onSaved={(note,context)=>{saveNoteFor=null;noteSaved(context.conversationId,context.messageIndex,note);}}/>{/if}
+
+{#if chooseSaveFolder&&!folderPickerOpen&&draft}<Modal label={$t("保存文档")} class="new-document-dialog" onClose={()=>finishSaveFolder(null)}>
+ <form class="save-document-form" on:submit|preventDefault={()=>finishSaveFolder(newDocumentFolder)}>
+  <div class="dialog-head"><h2>{$t("保存文档")}</h2><Button.Root type="button" class="icon-button" aria-label={$t("关闭")} onclick={()=>finishSaveFolder(null)}>{@html icon('close')}</Button.Root></div>
+  <div class="dialog-body">
+   {#if saveNameNeeded}<label class="save-document-name"><span>{$t("文件名")}</span><Input data-autofocus aria-label={$t("文件名")} bind:value={draft.name} required onfocus={event=>event.currentTarget.select()} oninput={()=>{dirty=true;saveFolderError='';}}/></label>{/if}
+   {#if draftFolder(draft)}<p class="save-document-location"><span>{$t("保存位置")}</span><strong>{basename(newDocumentFolder)}</strong></p>
+   {:else if roots.length}<p>{$t("选择文档的保存文件夹。")}</p><div class="save-folder-tree" role="group" aria-label={$t("保存位置")}><Tree nodes={roots} expanded={saveFolderExpanded} {cache} mode="folder" selected={newDocumentFolder} onbrowse={path=>newDocumentFolder=path} ontoggle={toggleSaveFolder}/></div>
+   {:else}<p>{$t("请先添加一个文件夹，再保存文档。")}</p><Button.Root type="button" class="outline" onclick={add}>{@html icon('plus')}{$t("添加文件夹")}</Button.Root>{/if}
+   {#if saveFolderError}<p class="form-error" role="alert">{saveFolderError}</p>{/if}
+  </div>
+  <div class="dialog-footer"><Button.Root type="button" onclick={()=>finishSaveFolder(null)}>{$t("取消")}</Button.Root><Button.Root type="submit" class="primary" disabled={!newDocumentFolder||!draft.name.trim()}>{$t("保存")}</Button.Root></div>
+ </form>
+</Modal>{/if}
+{#if folderPickerOpen}<FolderPicker initialTab={folderPickerTab} initialDirectory={folderPickerDirectory} onShareReceived={path=>{void sharedReceived(path).catch(e=>notify($t(String(e))))}} defaults={{file_types:{markdown:true,text:true,code:false,config:false,...settings?.file_types},convert_other_formats:settings?.convert_other_formats??false,conversion_formats:settings?.conversion_formats}} roots={roots.map(root=>root.path)} onClose={()=>folderPickerOpen=false} onAdd={addFolders} onImported={refresh} onOpenImportedFolder={openImportedFolder} onDestinationChange={folder=>{if(settings)settings={...settings,chat_import_folder:folder}}}/>{/if}
+
+{#if folderIndexPath}<FolderIndexSettings path={folderIndexPath} onClose={()=>folderIndexPath=''} onSaved={rebuild=>{void refresh().catch(e=>notify($t(String(e))));notify($t(rebuild?'正在重新索引当前文件夹':'索引设置已保存，正在更新索引'))}}/>{/if}
+
+{#if settings&&!web}<UpdateNotification config={updateSettingsForLanguage(settings.updates,settings.language)} onOpen={()=>{settingsPage='about';settingsOpen=true}}/>{/if}
+
+<style>
+ .document-loading{display:flex;align-items:center;justify-content:center;gap:12px;padding:4px 12px;background:var(--color-panel);font-size:var(--text-caption)}
+ .composer-model-controls .quick-setup-action{flex-shrink:0;min-height:28px;padding:0 12px;font-size:12px}
+</style>
+
+{#if shareDialog}<ShareDialog path={shareDialog.path} initialCode={shareDialog.code} initialDirectory={shareDialog.directory??''} onClose={()=>shareDialog=null} onReceived={path=>{void sharedReceived(path).catch(e=>notify($t(String(e))))}}/>{/if}

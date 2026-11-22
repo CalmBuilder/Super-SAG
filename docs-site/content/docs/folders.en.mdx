@@ -1,0 +1,286 @@
+---
+title: "Folders"
+description: "Control search scope, file types and ignore rules."
+---
+
+## Add a folder and index its files
+
+Click **+** in the sidebar, select directories in **Add folder**, then click **Add to knowledge base**. You can select multiple folders across directories.
+
+![Select folders to add to the knowledge base](/images/product-add-folder-en.png)
+
+ Super-SAG indexes the selected file types while applying ignore rules. Later changes trigger incremental indexing. Indexing runs in the background: adding a large folder returns immediately, progress appears at the bottom of the sidebar, and search and Q&A stay available during indexing. During file-monitor setup, a preparation status is shown; large folders may take a few minutes before file scanning starts. If file monitoring fails, scanning continues and the completed index retains a warning that automatic updates are limited. Rebuild the index in indexing settings to retry. Explicitly adding a folder again resets its previous monitor before registering a new one. After the directory is restored, new file changes continue to update the index automatically.
+
+Markdown, plain text, RTF, Word, PowerPoint, Excel, OpenDocument, CSV, EPUB and text-based PDFs are enabled by default. Built-in anydoc parses Office, RTF, tables, ebooks and PDFs locally without downloading components. Code and configuration files follow their type settings. Install Docling when needed for scanned PDFs and other formats.
+
+![The example folder after indexing](/images/product-folders-en.png)
+
+## Startup, upgrades and index reuse
+
+When the background service starts, it checks registered folders against existing files, settings and indexes. “Checking text index”, “Checking basic text”, “Checking file conversions” or “Checking converted index” does not mean every file is being parsed or rebuilt. Unchanged indexes and compatible successful conversions are reused. New, changed or migration-affected content is updated as needed.
+
+If file metadata such as its modification time changes while its content stays the same, Super-SAG validates the source content and reuses compatible built-in non-PDF conversions. A complete, successful PDF conversion can also be reused when its source content and parsing rules remain compatible. Changes to optional parser component packages alone do not invalidate these complete results. An upgrade that requires a parsing-rule or index migration may still update affected documents once. Manually edited conversion files are preserved during normal parser upgrades.
+
+## Progressive indexing and search availability
+
+PDFs first attempt to extract their basic text layer. Mixed text/scanned PDFs and image-only scans continue with background OCR and table structure processing. PDFs with usable text on every page retain built-in anydoc completion without an additional Docling enhancement pass. Once basic text is indexed, it can be searched while enhancement continues. Search coverage increases as background processing finishes. Basic indexing and enhancement use separate background workers. New or changed files in the same folder can continue extracting and indexing basic text while an older PDF undergoes OCR or table enhancement. Index details list basic indexing and background enhancement progress separately. Actual concurrency remains subject to memory budgets, parsers and source-change validation. The file list shows:
+
+| Status | Search availability |
+| --- | --- |
+| Basic text searchable · Enhancement pending | Extracted text layer; OCR and table enhancement have not finished |
+| Basic text searchable · Enhancing | Basic text is searchable while scanned content and tables are processed |
+| Basic text searchable · Enhancement failed | Basic text remains searchable; check indexing details and retry |
+| Awaiting parsing | No searchable text is available; background processing will try applicable parsers |
+| Parsing content · Not searchable yet | Document processing has not produced searchable text yet |
+| Awaiting OCR | Scanned content confirmed to lack a usable text layer must wait for OCR |
+| Recognition failed · Not searchable | No completed basic text is available; check indexing details and retry |
+
+With local built-in parsing, supported non-PDF documents such as Word, RTF and spreadsheets also extract text on the basic-indexing worker, without waiting for a large PDF to finish enhancement. Files that fail built-in parsing or need additional components enter the background parsing queue. Formats configured for cloud parsing retain their existing parser order.
+
+The basic stage may omit scanned images, complex tables or final source positioning. Wait for enhancement and check the original before relying on complete coverage. Image-only scans are not marked searchable simply because they are queued. Pausing background processing preserves access to completed basic indexes.
+
+The sidebar card shows the current activity, completed file count / files in the current task, and the current filename. **View details** expands inline to show search availability, the actual parser, PDF parts and page range. A part currently being processed is not counted as completed. **Searchable after processing** means no basic text has been indexed yet; **Some content is searchable** means basic text is indexed while enhancement continues. New files that become indexed during processing appear in the details.
+
+After processing ends, the card no longer shows a current filename and can be dismissed using its top-right close button. Dismissing it preserves results; new tasks or changed failure results show the card again. The close button is unavailable while processing is active or paused. When files fail, **Some files could not be processed** opens details listing every retryable failed file and its cause. **Retry failed files** retries only those files and preserves successful indexes; it is unavailable while a task is active or paused. Background status polling restores the retry result even if task-start or completion notifications are missed. Directory or watcher errors remain visible, but do not enable file retry. **Index history** keeps access to detailed task history and pause/resume controls.
+
+
+![Dismiss the completed processing card using its close button](/images/product-index-complete-en.png)
+
+## Office text only
+
+Enable **Office text only** in **Settings → File settings** to index DOCX/PPTX text while skipping images and embedded objects. It is off by default and does not cover legacy DOC/PPT, DOCM/PPTM or other formats. Body text, tables, text boxes and supported notes retain built-in parsing. Known Word text parts, such as footnotes and endnotes, are retained by their declared content type, including custom names or paths. Text inside images and embedded attachments is not recognized.
+
+Filtering occurs before ZIP members are opened, read or decompressed, retaining only necessary Office XML by path and content type. Container directories, relationships and text XML still need reading; source fingerprinting still reads the original file in chunks, so this does not promise zero disk I/O over compressed image bytes. Input, XML decompression, entry count, nesting, output and timeout limits remain enforced.
+
+This mode takes precedence over ordinary cloud parsing for these formats. Fallbacks must provide the same resource-skipping guarantee. Currently only the restricted-package built-in path qualifies, so a failure never automatically invokes ordinary Docling or cloud parsing. Unsupported structures, such as nonstandard main-part locations or inline binary XML, report an error rather than silently claiming complete coverage. Toggling the setting rechecks affected documents; content and failure caches distinguish the two modes. Original files are unchanged.
+
+![Office text-only setting](/images/product-office-text-en.png)
+
+## Limit your search scope
+
+Add only the directories you need. Query scope is independent from the folder you are currently browsing. Browsing a folder does not change the search or Q&A scope automatically.
+
+## Ignore files
+
+Both `.gitignore` and `.sagignore` apply in project roots and subfolders. `.sagignore` has higher priority.
+
+```text
+node_modules/
+dist/
+.env
+**/*.generated.md
+```
+
+Exclude sensitive files that you do not want retrieved or sent to model services. After changing rules, check index status to confirm coverage.
+
+## Remove and clear
+
+Removing a directory from the knowledge base removes its registration and index while preserving original files. Removing a subfolder records an exclusion; adding the same subfolder restores it.
+
+Clear files in settings clears the knowledge base index. Conversation records and file indexes are managed separately; read the action description before proceeding.
+
+## Check from the CLI
+
+```sh
+super-sag list
+super-sag check
+super-sag add --types md,txt,html,py,js,ts,tsx,json,yaml
+```
+
+`--types` selects text or built-in document formats for that directory, such as `md,docx,pdf,xlsx`. Basic indexed text is searchable before background enhancement finishes.
+
+## File settings in detail
+
+Location: **Settings → File settings**. Global settings apply to folders without their own overrides. Save file-type, exclusion or chunking changes first, then check that indexing completes.
+
+### File types to index
+
+| Option | Contents | Default |
+| --- | --- | --- |
+| Markdown | `.md`, `.markdown` | On |
+| Text and documents | `.txt`, `.rtf`, `.docx`, `.pptx`, `.xlsx`, `.odt`, `.epub`, `.pdf` | On |
+| Code | `.py`, `.js`, `.ts`, `.rs`, `.html`, `.css` | Off |
+| Configuration | `.json`, `.yaml`, `.toml`, `.xml`, `.ini` | Off |
+
+Disabling a type removes it from indexing and retrieval while preserving original files and browsing. For code repositories, enable code and configuration or select extensions using CLI `--types`.
+
+**Reindex** is in the first row of this card. It checks all files using saved file types and excluded folders, updating only changed indexes. When no folders have been added, the button is disabled and the description prompts you to add a folder.
+
+![Global file types and indexing settings](/images/product-file-settings-en.png)
+
+### Preferred parser
+
+In **Settings → File settings → Document parsing**, choose **Docling**, **MinerU**, or a configured answer model, then click **Save settings**.
+
+- **Docling**: Common documents use the built-in parser first. Installed Docling handles OCR and files the built-in parser does not support. Open **Configure Docling** to install components, select formats, or adjust concurrency.
+- **MinerU**: After a key is configured, supported documents use the selected MinerU provider first and fall back to applicable local parsers on failure. Without a key, parsing stays local. [See MinerU configuration](/en/docs/models#mineru-document-parsing).
+- **Answer model**: Choose a model that accepts images from the configured answer models. Select **Configure model** to edit the provider, endpoint and API key shared with Q&A, or test the connection with a bundled sample image. The bundled PDFium renders PDF pages individually for recognition, and the model reads PNG and JPEG images directly. Select the image formats under **File types to index → More file formats**. To use the model on existing files, save your settings and choose **Reindex**.
+
+In **Configure model**, edit the **PDF prompt** and **Image prompt** separately. Each field has its own **Reset to default** button. A blank field also uses the default prompt. Choose **Done**, then **Save settings** to apply your changes. To process existing files with the new prompts, choose **Reindex**.
+
+![Configure the PDF and image parsing prompts](/images/product-vision-parser-en.png)
+
+Switching parsers keeps your MinerU configuration and key. Existing installations retain their previous parsing behavior on upgrade.
+
+For large PDFs split into parts, MinerU image-only tables retain their images, captions and footnotes. Empty table placeholders are ignored; a meaningful table missing both body and image still triggers fallback. If a part falls back to Docling, subsequent fallback parts in the same document reuse the local worker and loaded models. The worker starts only when needed and is released when processing ends; existing successful conversion caches remain reusable.
+
+### More file formats and conversion
+
+Text and documents is one setting, enabled by default. TXT and RST are read directly. When parsing locally, Super-SAG tries built-in anydoc first for Word (`.doc`, `.docx`, `.docm`), PowerPoint (`.ppt`, `.pps`, `.pot`, `.pptx`, `.pptm`, `.ppsx`, `.ppsm`), Excel (`.xls`, `.xlsx`, `.xlsm`, `.xlsb`), OpenDocument (`.odt`, `.ods`, `.odp`), RTF, CSV, EPUB and text-based PDFs.
+
+The built-in PDF parser extracts the text layer plus superscripts and subscripts but does not reconstruct formula structure. To view formulas as TeX, choose MinerU in Document parsing and enable Formula recognition. Word OMML equations, including newer MathType equations, are converted to TeX; answers and the reader share the same formula renderer.
+
+More file formats lists scanned PDFs, images, audio, video, email, Apple iWork and some document templates. Choose Select and pick the formats you need. MinerU supports applying its formats directly, and an answer model supports applying PDF, PNG and JPEG directly. If other local support is missing, choose Install and apply, confirm installation, then apply the selection. Document and media components are installed separately according to the selected formats. Scanning files never downloads components automatically.
+
+When Docling is selected, an installed Docling handles PDFs requiring OCR or content unsupported by the built-in parser. With MinerU selected, use the [MinerU-first flow](/en/docs/models#mineru-document-parsing). An answer model handles PDF, PNG, and JPEG, and other formats retain local parsing. Damaged and encrypted documents report parsing errors. Failed conversions record their reason. Change conversion settings or choose **Reindex** to retry them.
+
+Long PDFs are split into parts of at most 50 pages. Parts within one PDF follow the MinerU concurrency setting, which defaults to 2 and allows 1–16, capped by the number of parts. All documents share the total provider limit. Local fallback processes one part at a time. Each part independently tries the applicable parsers, and successful parts are cached for retries. Scanned PDFs that can be identified as having no text layer are handed off immediately to an installed OCR component, avoiding unnecessary text-conversion waits. The complete enhanced document is merged only after every enhancement part succeeds. Failures never publish incomplete enhanced text; completed basic indexes remain available. See [Document parsing](/en/docs/models#mineru-document-parsing).
+
+Windows recognition workers report memory-limit failures even when the process exits during startup. Failed results do not replace a completed index.
+
+When using Docling locally, standalone images use a lightweight OCR path and do not load the layout and table models intended for scanned PDFs. Scanned PDFs and files requiring full layout structure use the Docling document pipeline. Both paths run entirely offline. When several standalone images are processed together, the backend reuses OCR workers so models are not loaded for every image; workers exit after about 120 idle seconds and release their resources. Image recognition also follows **Settings → File settings → Docling conversion timeout**; waiting for a worker, memory admission and model loading all count toward this timeout. Increasing conversion workers processes more images at once, but excessive concurrency can cause CPU contention and heat, so throughput may stop improving.
+
+- **Select all / Clear selection** selects or clears all conversion formats. An empty selection disables additional formats without affecting enabled built-in documents.
+- **Apply** applies the format selection; global settings still need to be saved.
+- **Conversion workers** defaults to 4, allows 1–16, is shared across folders and takes effect on the next indexing task. Actual concurrency is also limited by the shared resource budget. Previously saved values are preserved.
+- **Conversion memory** defaults to automatic physical-memory allocation;[Runtime settings](/en/docs/preferences#runtime-settings) can adjust its percentage and per-job budget. By default, Docling tasks share half of physical memory; a regular document task may use one quarter. On smaller machines, the task allowance retains 4 GiB for OCR where possible, without exceeding the total budget. For example, a 64 GiB computer allows 16 GiB per task and 32 GiB in total. In automatic mode (per-task budget set to 0), each standalone-image OCR worker reserves up to 2 GiB, capped by the total budget. A nonzero per-task memory budget applies to both images and documents, subject to the total budget. Saved settings apply to new tasks; image tasks recreate idle workers that use old settings. Document accounting includes child processes, while lightweight image workers monitor their own process. Exceeding a limit stops processing without replacing an existing conversion result. Additional tasks queue when the budget is reserved; failure to read physical memory is reported as an error.
+- **Uninstall related components** removes Super-SAG-managed document and media components, runtimes, recognition models, FFmpeg and download caches. Original files, converted files and existing indexes remain; built-in document parsing stays available.
+
+Native text is indexed first, built-in documents and enabled additional formats are parsed in parallel, and finished results are then indexed. Already indexed content can be searched before every conversion finishes.
+
+In **Settings → File settings → Conversion output location**, choose:
+
+- **App data folder**: The default for new users. Conversion results are stored outside the library folders.
+- **Inside library folders**: Keep results in the hidden `.sag-converted` folder inside each library. Existing users retain this location on upgrade.
+- **Custom folder**: Choose a folder outside your libraries, such as a folder on a different drive. Each library's results are stored separately.
+
+Save after active indexing finishes. Super-SAG moves the conversion results for your registered folders, retaining images, manual edits, and existing indexes without running OCR again. You can still search the text and select **Open original file** from the converted document.
+
+![Conversion output location and timeouts](/images/product-conversion-storage-en.png)
+
+Built-in parsing does not upload files. Docling may require additional recognition models for scans, audio and video; first use includes model preparation. After a parser upgrade, reindexing updates built-in conversion results that have not been edited manually.
+
+### Install the Docling document component
+
+Online download of the document component is not configured. Built-in document parsing remains available, and a complete offline document component can be imported. Audio and video components are separate.
+
+### Import an offline document component
+
+At the bottom of the dialog, choose **Import offline component**, then select the extracted complete component folder containing `manifest.json`. Super-SAG checks its platform, component version and file integrity, then runs a sample conversion. If you started from a format selection, choose **Apply selected formats** once the component is ready. Reindex the folder if previous files failed to convert.
+
+A standalone Python installer or model download cannot replace the complete component. If you selected both document and media formats, choose **Retry installation** after the import to install the media component online. If the import fails, you can select another folder.
+
+A folder containing only uv still requires online downloads and cannot currently install the document component. A complete offline component must match the target system, architecture, and supported component version.
+
+### Watch file changes
+
+Enabled by default. Additions, edits, deletions and renames trigger indexing updates under the configured rules. When disabled, manually reindex as needed rather than assuming the index is current. Enabling it again triggers a file check.
+
+Watching runs in the shared background service. Closing the desktop window does not stop that service.
+
+### Show hidden folders
+
+Off by default. It affects only the right-side file list; the left sidebar still hides these folders. It does not control indexing, which follows file-type and exclusion rules.
+
+### Index workers
+
+Defaults to 8, allows 1–64 and applies to the next indexing task. Changing only worker count does not rebuild existing indexes. Lower it for large files if resource use is too high.
+
+Text index preparation shares a 512 MiB budget, with at least 64 MiB reserved per file. This budget also limits concurrency; later files wait when it is fully reserved. Total application memory includes additional database and cache usage.
+
+Each file has a chunk budget of at least 16 MiB. Heading costs are counted per final chunk, without counting a heading again for paragraphs merged into that chunk. Files exceeding resource limits are reported in index history, and their original contents remain unchanged.
+
+### Excluded directory names
+
+Enter one name per line. Defaults include `.git`, `node_modules`, `dist`, `target`, `.venv`, `venv` and `__pycache__`. Excluded directories remain browsable but are not indexed.
+
+Use `.sagignore` for more precise path or file patterns, directory rules and `!` negation. These combine with global exclusions and type selections to determine coverage.
+
+### Reindex and history
+
+**Rebuild failed files only:** when the lower-left indexing status card reports file-level failures, open **View details** to inspect the failure, then select **Retry failed files**. This retries current failed files across all added folders. Successful indexes and converted files are kept; this action does not scan the entire folder.
+
+Retrying a failed PDF also restores available basic text first, then continues enhancement in the independent background worker so new files can keep building their basic indexes.
+
+The card shows progress while rebuilding and prevents duplicate submissions. Both native and converted files count toward the rebuild history. Resume paused indexing before starting. Recovered files are removed from the current failures; unresolved component, file or permission problems remain visible. Stale failure records are removed for deleted or excluded files and files replaced by same-named directories; existing indexes inside those directories are preserved. If only a folder-reading or watcher error remains and there are no retryable files, the button is hidden; inspect the details and use folder-level or global reindexing.
+
+![Rebuild failed files from the lower-left status card](/images/product-index-retry-en.png)
+
+Global **Reindex** checks all registered directories using saved types and exclusions, updating changed indexes. Save relevant changes before running it.
+
+The lower-left indexing card has **Pause indexing / Resume indexing** and a close button beside its title. These controls work without expanding details. You can hide the card while processing; it stays hidden during updates to the same run while background work continues. Open **Settings → File settings → Index history → View** to inspect, pause or resume a hidden task.
+
+![Pause and close controls beside the indexing card title](/images/product-index-controls-en.png)
+
+**Show index details** is under **Settings → File settings → Indexing and display** and is off by default. Enable it and save to show indexing status and the details entry at the top of the Files page. When hidden, use **Index history → View** to check progress and failures. Background indexing continues.
+
+![Show index details is off by default](/images/product-index-display-en.png)
+
+Open **Index history → View** to inspect progress, completion and failures. The sidebar, task details and newly recorded history distinguish checks from actual index updates:
+
+| Count | Meaning |
+| --- | --- |
+| Checked | Index targets checked during this task |
+| Reused | Targets with no update or failure in this task whose existing indexes or compatible conversions remain usable |
+| Updated | Targets whose indexes were actually written, updated or removed during this task |
+| Failed | Targets that failed during this task; inspect failure details for the cause |
+
+A document may publish searchable basic text and then fail enhancement. It counts as both Updated and Failed, so the four numbers must not be added as a file total. These counts deduplicate index targets within the current task across processing stages. PDF parts do not count separately. “Current stage: processed … files” still describes only the current stage; it is not the number of documents rebuilt. Older history without this summary keeps its original processed counts and does not estimate reuse or updates. Check error paths and messages rather than assuming a total file count means everything succeeded.
+
+Exceptionally long table rows are indexed in smaller passages without editing the original file or its line breaks. Results still point to the original locations. File size and memory budgets remain enforced; exceeding them reports an error instead of writing an incomplete index.
+
+The bottom of the sidebar shows the current stage, progress and partial failures. During file conversion, a separate **Parser** line identifies the parser actually in use, such as MinerU, anydoc or Docling. When concurrent files use different parsers, their names appear together. Parser and PDF-part labels describe only the task shown in the status card, without mixing in another task's parsing activity. The label updates when a failed attempt falls back to another parser. Before a parser starts, it shows “Checking conversion status…”; the line disappears outside conversion stages. Index details also identify the parser for each active file. After pausing, a file that is still finishing continues to show its parser until that work ends.
+
+Expand a long PDF’s progress to see the completed and total parts, plus the original pages, parser, and phase for each active part. Parts count as soon as their results are cached, including out-of-order completions and cache hits. The waiting count shows how many parts are queued for local parsing. Each PDF counts as one file, and its complete text is merged in original page order.
+
+![PDF part progress alongside file counts](/images/product-pdf-part-progress-en.png)
+
+Longer text wraps while keeping the close button available. Select **View details** to expand the card, then use **Index history** to inspect task details.
+
+After you dismiss a failure notice, the app remembers the current failure details and keeps that notice hidden when you reopen the interface. New indexing runs still show progress, and changed failure details trigger a new notice. You can still inspect dismissed failures through **Index history → View**, or through the Files page status card when **Show index details** is enabled.
+
+![Current document processing status in the sidebar](/images/product-index-status-en.png)
+
+![After hiding the sidebar notice, the Files page still shows index status](/images/product-index-status-dismissed-en.png)
+
+**Removed files and folders → Restore** adds an excluded path back and starts indexing. Restore only content you want searchable again.
+
+
+### Recent indexing and failures
+
+Index details shows the latest record for each folder. Expand older records to inspect earlier runs. A failed run includes a readable explanation and file details; use the file entry to locate the affected source. Clearing history removes records, not the existing index.
+
+
+Indexing details check text indexes, file conversions and converted indexes in turn, with progress for the current stage. Actual parsing shows “Parsing files” and the active parser. Already indexed content remains searchable. Select **Pause indexing** to pause after in-progress files finish, or **Resume indexing** to continue.
+
+## Per-folder index settings
+
+![Index options for one folder](/images/product-folder-options-en.png)
+
+Open **Index settings** from a folder menu to select native types and conversion formats for that folder. Settings apply to the directory and subfolders without their own configuration; child overrides take precedence.
+
+Options are stored in the managed section of that folder's `.sagignore`. Existing handwritten rules are preserved.
+
+- **Save** stores options and updates the index under the new rules.
+- **Reindex** clears that folder's old index and rebuilds it. Other folders and original files are preserved.
+- **Cancel** discards unsaved option changes.
+
+Per-folder Reindex rebuilds that directory; global Reindex checks and updates changed content under saved rules. Their scope and behavior differ.
+
+## Web clipping folder
+
+[Web Clipper](/en/docs/web-clipper) saves independently. To index its output, choose Add clipping folder in Web Clipper settings and select the actual save folder. Existing watch and indexing rules then apply.
+
+First-time initialization creates `Documents/super-sag/clippings` and adds `Documents/super-sag` as the default managed folder. Existing libraries and removed folders are not added again on restart.
+
+## Follow import progress
+
+Open an imported folder to see a persistent status above its file list: queued, checking indexes and conversions, or actually parsing files. It includes current filenames and counts for the current stage. Unknown totals have no percentage. Stage counts are neither overall progress nor the number of documents rebuilt. Use **View indexing details** to inspect active tasks and errors. If another folder is being processed, the waiting state is explicit; completed folders retain their indexed-file count.
+
+![File processing states and sidebar progress](/images/product-folder-progress-en.png)
+
+Adding a folder restores the sidebar status. The app also checks backend snapshots to recover missed progress events. Removing a top-level folder cancels its ongoing or paused conversions and remaining indexing so queued folders can proceed, without deleting original files or stopping other folders.
+
+Selecting a sidebar file switches directly to the document once its content is ready, keeping the current content during loading without an intermediate folder list. Rapid selections honor the latest file; a failed read preserves the previous page and displays an error.
+
+Previously failed files display “Retrying failed conversions” while being retried. A regular conversion stage starts with “Checking file conversions” and switches to “Parsing files” when the current task begins actual parsing. These states do not change reuse of successful results.

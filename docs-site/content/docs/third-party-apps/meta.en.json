@@ -1,0 +1,5 @@
+{
+  "title": "Third-party apps",
+  "defaultOpen": false,
+  "pages": ["../import-evernote", "../import-google-keep", "../import-apple-notes"]
+}

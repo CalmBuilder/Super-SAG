@@ -1,0 +1,95 @@
+---
+title: "MCP guide"
+description: "Connect to Super-SAG over Streamable HTTP to search source passages and browse folders."
+---
+
+| Client setting | Value |
+| --- | --- |
+| Transport | **Streamable HTTP** |
+| Local address | `http://127.0.0.1:24681/mcp` (default) |
+| LAN address | `http://192.168.1.10:24681/mcp` (example) |
+| Authentication | `Authorization: Bearer <API_KEY>`. Use the full API key. |
+
+## Connect an MCP client
+
+1. Add the folders you want to search on the computer running Super-SAG. Open **Settings → Remote services**, create an API key, and enable the API. You can also start the service with the standalone CLI; see [Start the service](/en/docs/api-guide#start-the-service).
+2. Choose **Local MCP** on the same computer or **LAN MCP** on another computer on the network. Click the copy icon beside that address. If multiple copyable keys exist, select the key for this project before importing the complete configuration into your client. A single copyable key is used directly.
+3. Save and confirm that the client lists `search` and `folders`. Try asking: “Use Super-SAG to list the indexed folders, then quickly search Project Notes for ‘deployment steps’ and tell me where the matching passages are.”
+
+### Export configuration with the CLI
+
+On the computer running Super-SAG, run `super-sag api status` to see the local and available LAN MCP addresses. Both text and `--json` status show only the key count.
+
+```sh
+super-sag api mcp config
+super-sag api mcp config --address http://192.168.1.10:24681/mcp --key-id KEY_ID
+```
+
+The first command uses the local address and the most recently created copyable key. For the second command, use an address from the status output and an ID from `super-sag api key list`. Import the resulting JSON into your client. Keep the configuration private because it contains the full key. If the backend is stopped, run `super-sag api start` first.
+
+If your client imports `mcpServers` JSON, use this format. If you already have other servers, add `super-sag` to your existing `mcpServers` object.
+
+```json
+{
+  "mcpServers": {
+    "super-sag": {
+      "type": "http",
+      "url": "http://127.0.0.1:24681/mcp",
+      "headers": {
+        "Authorization": "Bearer <API_KEY>"
+      }
+    }
+  }
+}
+```
+
+## Available tools
+
+### `search`: Search source passages
+
+| Parameter | Description |
+| --- | --- |
+| `query` | Required. A keyword or full question, 1–2,000 characters. |
+| `mode` | `fast` matches keywords without a model. `deep` finds evidence for a full question and requires a decision model configured in Super-SAG. Defaults to `deep`. |
+| `paths` | Optional. One or more absolute directory paths on the server. Omit it or pass `[]` to search all folders allowed by the current key; full-library keys keep their existing behavior. |
+| `limit` | Optional. Maximum number of source passages, 1–100. Defaults to 10. |
+
+Example arguments for a quick search in Project Notes:
+
+```json
+{
+  "query": "deployment steps",
+  "mode": "fast",
+  "paths": ["/data/project-notes"],
+  "limit": 5
+}
+```
+
+Each entry in `results` includes the file `path`, `heading`, `start_line`, `end_line`, and passage `content`. No matches return an empty array.
+
+### `folders`: Browse folders
+
+Pass `{}` to list the current key’s granted entry folders. Full-library keys still list all roots; a granted subfolder is itself an entry folder. Pass `path` to list the immediate subfolders of a directory, for example:
+
+```json
+{"path": "/data/project-notes"}
+```
+
+The returned `folders` array contains each folder's `name` and absolute `path`. Use those paths in `search` to narrow its scope. Both tools are read-only: they cannot add folders or change files.
+
+## Troubleshooting
+
+| Symptom | What to check |
+| --- | --- |
+| Cannot connect or see the tools | Confirm the API is running, the client supports Streamable HTTP, and the URL ends in `/mcp`. For another computer, check the LAN address and port. |
+| `401` response | Check that the header contains the full key and the `Bearer ` prefix, and that the key has not been revoked. |
+| Decision model is not configured | Set a decision model in Super-SAG, or specify `mode: "fast"`. |
+| Path denied or no matches | Use `folders` to confirm the server's directory path, then check that the files are indexed. |
+
+## Use different folders for different projects
+
+Create a separate key for each project and select its directories in [API settings](/en/docs/api-guide#limit-folders-by-project). Projects A and B can share the same `/mcp` address while using different keys. Searches without paths stay within each key’s scope, and shared folders may be granted to both. Store each configuration in the client’s project settings; projects using the same key have the same access scope.
+
+When exporting through the CLI, specify `super-sag api mcp config --key-id KEY_ID`. The existing command without `--key-id` still uses the most recently created copyable key for script compatibility.
+
+Existing keys and MCP configurations retain full-library access after upgrading. No endpoint, credential or tool-call changes are needed. A key becomes restricted only when you explicitly edit its scope. Unavailable grants return `scope_unavailable`; paths outside the scope return `path_not_allowed`, without searching other folders.

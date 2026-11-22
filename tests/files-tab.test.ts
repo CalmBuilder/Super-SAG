@@ -1,0 +1,325 @@
+// @vitest-environment happy-dom
+import {afterEach,beforeEach,expect,it,vi} from 'vitest';
+import {mount,tick,unmount} from 'svelte';
+import App from '../src/App.svelte';
+import {indexedDirectoryEntries} from '../src/lib/domain';
+const {invoke,listeners}=vi.hoisted(()=>({invoke:vi.fn(),listeners:new Map<string,(event:{payload:any})=>void>()}));
+vi.mock('@tauri-apps/api/core',()=>({invoke}));
+vi.mock('@tauri-apps/api/event',()=>({listen:vi.fn(async(name,handler)=>{listeners.set(name,handler);return()=>listeners.delete(name)})}));
+vi.mock('@tauri-apps/api/window',()=>({getCurrentWindow:()=>({onCloseRequested:async()=>()=>{}})}));
+vi.mock('@tauri-apps/plugin-dialog',()=>({open:vi.fn()}));
+const files=[{id:1,path:'/notes/intro.txt',name:'intro.txt'},{id:2,path:'/notes/nested/deep/result.txt',name:'result.txt'}];
+let app:ReturnType<typeof mount>|undefined;
+beforeEach(()=>{
+ localStorage.removeItem('sag.sidebar.expanded');
+ invoke.mockImplementation(async(command,args)=>{
+  if(command==='get_settings')return{theme:'light',start_page:'ask',editor_size:15,answer:{model:'test',models:['test']}};
+  if(command==='list_roots')return[{path:'/notes',name:'Notes',status:'ready',count:2,error:null}];
+  if(command==='list_files')return files;
+  if(command==='get_index_status')return{paused:false,tasks:[]};
+  if(command==='browse_folders')return{path:'/home',parent:'/',home:'/home',folders:[]};
+  if(command==='list_entries'){
+   if(args.path==='/notes')return[{path:'/notes/intro.txt',name:'intro.txt',directory:false,symlink:false},{path:'/notes/private.bin',name:'private.bin',directory:false,symlink:false},{path:'/notes/nested',name:'nested',directory:true,symlink:false}];
+   if(args.path==='/notes/nested')return[{path:'/notes/nested/deep',name:'deep',directory:true,symlink:false}];
+   if(args.path==='/notes/nested/deep')return[{path:'/notes/nested/deep/result.txt',name:'result.txt',directory:false,symlink:false}];
+   return[];
+  }
+  if(command==='read_document')return{id:2,path:args.path,name:args.path.split('/').at(-1),body:'已索引文档正文',hash:'original'};
+  return[];
+ });
+});
+afterEach(async()=>{if(app)await unmount(app);app=undefined;document.body.innerHTML='';vi.clearAllMocks();listeners.clear();localStorage.removeItem('sag.sidebar.expanded')});
+const fileTab=()=>document.querySelector<HTMLButtonElement>('.workspace-switch [title="文件"]')!;
+async function start(){app=mount(App,{target:document.body});await vi.waitFor(()=>expect(document.querySelector('.ask-content')).not.toBeNull())}
+it.each(['success','failed'] as const)('首次同步 %s 后按结果处理导入窗口和文件侧栏',async(status)=>{
+ const root='/Documents/super-sag';
+ const platform=`${root}/data-sources/github`;
+ const directory=`${platform}/repo`;
+ const branch='github:tree:main:';
+ const readme='github:blob:main:README.md';
+ const succeeded=status==='success';
+ let saved=false,finished=false;
+ const fallback=invoke.getMockImplementation()!;
+ const source={id:'github-saved',name:'owner/repo',connection:{platform:'github',address:'https://github.com/owner/repo',app_id:'',drive:false},resources:[readme],directory,schedule:'manual',daily_time:'09:00',paused:false};
+ invoke.mockImplementation(async(command,args)=>{
+  if(command==='get_settings')return {
+   ...await fallback(command,args),language:'zh-CN',
+   answer:{url:'http://localhost',model:'test',models:['test'],has_key:false},
+   jev:{url:'http://localhost',model:'jev',models:[],has_key:false},
+   retrieval:{candidate_k:50,seed_k:10,expansion_term_limit:20,max_hops:1,top_k:10,chunk_chars:512},
+  };
+  if(command==='list_roots')return finished&&succeeded?[{path:root,name:'super-sag',status:'ready',count:1,error:null}]:[];
+  if(command==='list_files')return [];
+  if(command==='list_entries'){
+   const children:Record<string,string>={[root]:`${root}/data-sources`,[`${root}/data-sources`]:platform,[platform]:directory,[directory]:`${directory}/main`};
+   const path=children[args.path];
+   return path?[{path,name:path.split('/').at(-1),directory:true,symlink:false}]:[];
+  }
+  if(command==='get_share_settings')return {directory:'',clipboard:false};
+  if(command==='online_import'){
+   const {action}=args;
+   if(action.action==='browse')return {cursor:null,items:action.parent
+    ?[{id:readme,title:'README.md',expandable:false}]
+    :[{id:branch,title:'main',expandable:true}]};
+   if(action.action==='save'){saved=true;return source;}
+   return {documents:'/Documents',sources:saved?[{
+    source,next_at:null,running:!finished,last:{started:1,finished:finished?2:null,result:{
+     status:finished?status:'running',imported:finished&&succeeded?1:0,updated:0,skipped:0,conflicts:0,
+     failed:finished&&!succeeded?1:0,issues:[],
+    }},
+   }]:[]};
+  }
+  return fallback(command,args);
+ });
+ const labelled=(label:string)=>document.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`);
+ const named=(label:string)=>[...document.querySelectorAll<HTMLButtonElement>('button')].find(button=>button.textContent?.trim()===label);
+ await start();
+ labelled('设置')!.click();await tick();
+ named('数据源')!.click();await tick();
+ labelled('配置 GitHub')!.click();
+ const url=await vi.waitFor(()=>{
+  const input=document.querySelector<HTMLInputElement>('input[placeholder="https://github.com/owner/repo"]');
+  expect(input).not.toBeNull();return input!;
+ });
+ url.value=source.connection.address;url.dispatchEvent(new Event('input',{bubbles:true}));await tick();
+ named('浏览分支')!.click();
+ await vi.waitFor(()=>expect(labelled('打开 main')).not.toBeNull());
+ labelled('打开 main')!.click();
+ const checkbox=await vi.waitFor(()=>{
+  const label=[...document.querySelectorAll('label')].find(label=>label.textContent?.trim()==='README.md');
+  expect(label).toBeDefined();return label!.querySelector('input')!;
+ });
+ checkbox.click();await tick();named('保存并导入')!.click();
+ await vi.waitFor(()=>expect(named('停止同步')).toBeDefined());
+ expect(document.querySelector('.online-import')).not.toBeNull();
+ expect(document.querySelector('.folder-browser')).toBeNull();
+ finished=true;
+ if(succeeded){
+  await vi.waitFor(()=>expect(document.querySelector('.settings-window')).toBeNull(),{timeout:3500});
+  expect(document.querySelector('.online-import')).toBeNull();
+  expect(document.querySelector('.folder-browser h1')?.textContent).toBe('repo');
+  expect(document.querySelector(`.tree-name[title="${directory}"]`)?.getAttribute('aria-current')).toBe('page');
+  expect(invoke).toHaveBeenCalledWith('list_entries',{path:directory});
+ }else{
+  await vi.waitFor(()=>expect(named('重试失败项')).toBeDefined(),{timeout:3500});
+  expect(document.querySelector('.settings-window')).not.toBeNull();
+  expect(document.querySelector('.folder-browser')).toBeNull();
+ }
+});
+it('Windows 侧栏和文件列表提示显示普通路径，浏览仍提交原始路径',async()=>{
+ const path=String.raw`\\?\D:\资料`,child=path+'\\intro.txt';
+ const fallback=invoke.getMockImplementation()!;
+ invoke.mockImplementation(async(command,args)=>{
+  if(command==='list_roots')return[{path,name:'资料',status:'ready',count:1,error:null}];
+  if(command==='list_files')return[{id:1,path:child,name:'intro.txt'}];
+  if(command==='list_entries')return[{path:child,name:'intro.txt',directory:false,symlink:false}];
+  return fallback(command,args);
+ });
+ await start();
+ const root=document.querySelector<HTMLButtonElement>('.tree-name')!;
+ expect(root.title).toBe(String.raw`D:\资料`);root.click();
+ await vi.waitFor(()=>expect(document.querySelector<HTMLButtonElement>('.simple-file-entry .simple-file-row')?.title).toBe(String.raw`D:\资料\intro.txt`));
+ expect(invoke).toHaveBeenCalledWith('list_entries',{path});
+ document.querySelector<HTMLButtonElement>('.simple-file-entry .simple-file-row')!.click();
+ await vi.waitFor(()=>expect(invoke).toHaveBeenCalledWith('read_document',{path:child}));
+});
+async function open(path:string){document.querySelector<HTMLButtonElement>(`.simple-file-list [title="${path}"]`)!.click();await vi.waitFor(()=>expect(path.endsWith('.txt')?document.querySelector('.readonly-document'):document.querySelector(`.folder-browser h1`)?.textContent===path.split('/').at(-1)).toBeTruthy())}
+it('转换仍在运行时，已发布的文件会更新总数和类型图表',async()=>{
+ let completed=1;
+ const fallback=invoke.getMockImplementation()!;
+ invoke.mockImplementation(async(command,args)=>{
+  if(command==='get_settings')return{theme:'light',start_page:'files',editor_size:15,answer:{model:'test',models:['test']}};
+  if(command==='list_roots')return[{path:'/notes',name:'Notes',status:'indexing',count:completed,error:null}];
+  if(command==='get_index_status')return{paused:false,tasks:[{path:'/notes',stage:'converting',completed,total:50,files:['/notes/next.pdf']}]};
+  if(command==='list_files')return Array.from({length:completed},(_,i)=>({id:i+1,path:`/notes/.sag-converted/report-${i}.pdf.md`,name:`report-${i}.pdf.md`}));
+  return fallback(command,args);
+ });
+ app=mount(App,{target:document.body});
+ await vi.waitFor(()=>expect(listeners.has('data-changed')).toBe(true));
+ await vi.waitFor(()=>expect(document.querySelector('.file-stats-heading strong')?.textContent).toBe('1'));
+ completed=2;listeners.get('data-changed')!({payload:null});
+ await vi.waitFor(()=>expect(document.querySelector('.file-stats-heading strong')?.textContent).toBe('2'));
+ expect(document.querySelector('.file-type-legend')?.textContent).toContain('PDF2');
+ expect(document.querySelector('.folder-count')?.textContent).toContain('2 个已索引文件');
+ expect(document.querySelector('.index-state')?.textContent).toBe('正在索引');
+});
+it('文件标签从总览逐层进入，保留未索引文件，原文返回所属目录',async()=>{
+ await start();fileTab().click();
+ await vi.waitFor(()=>expect(fileTab().getAttribute('aria-current')).toBe('page'));
+ expect(document.querySelector('.folder-browser h1')?.textContent).toBe('已索引文件');
+ expect(document.querySelector('.folder-count')?.textContent).toBe('1 个文件夹 · 2 个已索引文件');
+ expect([...document.querySelectorAll('.library-folder-title .library-folder-action')].map(button=>button.textContent)).toEqual(['新建文档','添加文件夹']);
+ expect(document.querySelector('.workspace-header .library-folder-action')).toBeNull();
+ expect(document.querySelector('.file-stats-heading strong')?.textContent).toBe('2');
+ document.querySelector<HTMLButtonElement>('.library-index-details')!.click();
+ await vi.waitFor(()=>expect(document.querySelector('.index-issues-dialog')).not.toBeNull());
+ expect(document.querySelector('.index-history')).not.toBeNull();
+ document.querySelector<HTMLButtonElement>('[aria-label="关闭索引详情"]')!.click();await tick();
+ await open('/notes');
+ await vi.waitFor(()=>expect(document.querySelector('.folder-browser h1')?.textContent).toBe('notes'));
+ expect(document.querySelector('.simple-file-list [title="/notes/intro.txt"]')).not.toBeNull();
+ expect(document.querySelector('.library-topbar')).toBeNull();
+ expect(document.querySelector('.library-tabs')).toBeNull();
+ expect(document.querySelector('.workspace-header .workspace-back')).toBeNull();
+ expect(document.querySelector('.library-folder-title .library-folder-action')?.textContent).toBe('新建文档');
+ expect(document.querySelector('.library-folder-title .library-explore')?.textContent).toBe('探索模式');
+ expect(document.querySelector('.library-stats')).toBeNull();
+ expect([...document.querySelectorAll('.simple-file-entry.unindexed')].some(entry=>entry.textContent==='private.bin')).toBe(true);
+ await open('/notes/nested');await open('/notes/nested/deep');await open('/notes/nested/deep/result.txt');
+ await vi.waitFor(()=>expect(document.querySelector('.readonly-document')?.textContent).toContain('已索引文档正文'));
+ expect(fileTab().getAttribute('aria-current')).toBe('page');
+ document.querySelector<HTMLButtonElement>('.editor-head [title="返回文件夹"]')!.click();await tick();
+ await vi.waitFor(()=>expect(document.querySelector('.folder-browser h1')?.textContent).toBe('deep'));
+ for(const title of ['nested','notes','已索引文件']){
+  document.querySelector<HTMLButtonElement>('.library-parent')!.click();await tick();
+  await vi.waitFor(()=>expect(document.querySelector('.folder-browser h1')?.textContent).toBe(title));
+ }
+ expect(invoke.mock.calls.some(([command,args])=>command==='list_entries'&&args.path==='/')).toBe(false);
+});
+it('从问答页点击侧边栏文件，自动选中文件标签，返回时显示文件夹',async()=>{
+ await start();
+ document.querySelector<HTMLButtonElement>('[aria-label="展开Notes"]')!.click();await tick();
+ await vi.waitFor(()=>expect(document.querySelector('.tree [title="/notes/intro.txt"]')).not.toBeNull());
+ document.querySelector<HTMLButtonElement>('.tree [title="/notes/intro.txt"]')!.click();
+ await vi.waitFor(()=>expect(document.querySelector('.readonly-document')).not.toBeNull());
+ expect(fileTab().getAttribute('aria-current')).toBe('page');
+ expect(document.querySelector('.editor-head [title="返回会话"]')).toBeNull();
+ document.querySelector<HTMLButtonElement>('.editor-head [title="返回文件夹"]')!.click();await tick();
+ await vi.waitFor(()=>expect(document.querySelector('.folder-browser')).not.toBeNull());
+});
+it('文件标签切换保留问答和搜索输入',async()=>{
+ await start();
+ const ask=document.querySelector<HTMLTextAreaElement>('[aria-label="向你的文件提问"]')!;
+ ask.value='未发送的问题';ask.dispatchEvent(new Event('input',{bubbles:true}));await tick();
+ fileTab().click();await vi.waitFor(()=>expect(document.querySelector('.folder-browser')).not.toBeNull());
+ document.querySelector<HTMLButtonElement>('.workspace-switch [title="问答"]')!.click();
+ await vi.waitFor(()=>expect(document.querySelector('[aria-label="向你的文件提问"]')).not.toBeNull());
+ expect(document.querySelector<HTMLTextAreaElement>('[aria-label="向你的文件提问"]')!.value).toBe('未发送的问题');
+ document.querySelector<HTMLButtonElement>('.workspace-switch [title^="搜索"]')!.click();await vi.waitFor(()=>expect(document.querySelector('[aria-label="搜索关键词"]')).not.toBeNull());
+ const search=document.querySelector<HTMLInputElement>('[aria-label="搜索关键词"]')!;
+ search.value='未搜索的内容';search.dispatchEvent(new Event('input',{bubbles:true}));await tick();
+ fileTab().click();await vi.waitFor(()=>expect(document.querySelector('.folder-browser')).not.toBeNull());
+ document.querySelector<HTMLButtonElement>('.workspace-switch [title^="搜索"]')!.click();await vi.waitFor(()=>expect(document.querySelector('[aria-label="搜索关键词"]')).not.toBeNull());
+ expect(document.querySelector<HTMLInputElement>('[aria-label="搜索关键词"]')!.value).toBe('未搜索的内容');
+});
+it('点击文件夹管理从文档返回已索引文件最外层，添加按钮仍独立工作',async()=>{
+ await start();fileTab().click();
+ await vi.waitFor(()=>expect(document.querySelector('.folder-browser')).not.toBeNull());
+ await open('/notes');await open('/notes/intro.txt');
+ document.querySelector<HTMLButtonElement>('.folder-management-link')!.click();
+ await vi.waitFor(()=>expect(document.querySelector('.folder-browser h1')?.textContent).toBe('已索引文件'));
+ expect(fileTab().getAttribute('aria-current')).toBe('page');
+ await open('/notes');
+ document.querySelector<HTMLButtonElement>('.tree-heading [aria-label="添加文件夹"]')!.click();
+ await vi.waitFor(()=>expect(document.querySelector('[role="dialog"]')).not.toBeNull());
+ expect(document.querySelector('.folder-browser h1')?.textContent).toBe('notes');
+});
+it('Windows 路径只生成当前目录的直接子项，不混入相似目录',()=>{
+ const entries=indexedDirectoryEntries([{id:1,path:'C:\\notes\\deep\\a.txt',name:'a.txt'},{id:2,path:'C:\\notes\\deep\\b.txt',name:'b.txt'},{id:3,path:'C:\\notes-other\\outside.txt',name:'outside.txt'}],'C:\\notes');
+ expect(entries).toEqual([{path:'C:\\notes\\deep',name:'deep',directory:true,symlink:false}]);
+});
+it('文件页面隐藏顶部返回按钮，保留逐级返回和文件夹管理入口',async()=>{
+ await start();fileTab().click();await vi.waitFor(()=>expect(document.querySelector('.folder-browser')).not.toBeNull());
+ expect(document.querySelector('.library-parent')).toBeNull();
+ await open('/notes');await open('/notes/nested');await open('/notes/nested/deep');
+ expect(document.querySelector('.simple-file-list')?.firstElementChild?.textContent).toBe('返回上层');
+ expect(document.querySelector('.workspace-header .workspace-back')).toBeNull();
+ document.querySelector<HTMLButtonElement>('.folder-management-link')!.click();
+ await vi.waitFor(()=>expect(document.querySelector('.folder-browser h1')?.textContent).toBe('已索引文件'));
+ await open('/notes');await open('/notes/intro.txt');
+ expect(document.querySelector('.workspace-header .workspace-back')).toBeNull();
+ document.querySelector<HTMLButtonElement>('.folder-management-link')!.click();
+ await vi.waitFor(()=>expect(document.querySelector('.folder-browser h1')?.textContent).toBe('已索引文件'));
+});
+async function fileAction(label:string){
+ document.querySelector<HTMLButtonElement>('.simple-file-entry [title="/notes/intro.txt"]')!.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true,button:2}));
+ await vi.waitFor(()=>expect(document.querySelector('#context-menu')).not.toBeNull());
+ [...document.querySelectorAll<HTMLElement>('#context-menu [role="menuitem"]')].find(item=>item.textContent===label)!.click();await tick();
+}
+it('文件列表仅用右键打开菜单，连续右键可以切换文件与文件夹',async()=>{
+ await start();fileTab().click();await vi.waitFor(()=>expect(document.querySelector('.folder-browser')).not.toBeNull());await open('/notes');
+ expect(document.querySelector('.simple-file-list .file-options')).toBeNull();
+ for(const path of ['/notes/intro.txt','/notes/nested','/notes/intro.txt']){
+  const row=document.querySelector<HTMLButtonElement>(`.simple-file-list [title="${path}"]`)!;
+  row.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,cancelable:true,button:2,pointerType:'mouse'}));
+  row.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true,button:2}));
+  await tick();
+  await vi.waitFor(()=>expect(document.querySelectorAll('#context-menu')).toHaveLength(1));
+  expect(getComputedStyle(document.body).pointerEvents).not.toBe('none');
+ }
+ [...document.querySelectorAll<HTMLElement>('#context-menu [role="menuitem"]')].find(item=>item.textContent==='问答')!.click();
+ await vi.waitFor(()=>expect(document.querySelector('.reference-chip')?.textContent).toContain('intro.txt'));
+});
+it('单文件菜单限定问答引用与搜索范围',async()=>{
+ const base=invoke.getMockImplementation()!;
+ invoke.mockImplementation(async(command,args)=>{
+  if(command==='get_settings')return{...await base(command,args),search_summary_enabled:false};
+  if(command==='run_query')return{terms:[],results:[],trace:[],conversation:null};
+  return base(command,args);
+ });
+ await start();fileTab().click();await vi.waitFor(()=>expect(document.querySelector('.folder-browser')).not.toBeNull());await open('/notes');
+ await fileAction('问答');await vi.waitFor(()=>expect(document.querySelector('.reference-chip')?.textContent).toContain('intro.txt'));
+ const ask=document.querySelector<HTMLTextAreaElement>('[aria-label="向你的文件提问"]')!;ask.value='这篇文档讲了什么？';ask.dispatchEvent(new Event('input',{bubbles:true}));await tick();ask.closest('form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));
+ await vi.waitFor(()=>expect(invoke.mock.calls.some(([command])=>command==='run_query')).toBe(true));
+ expect(invoke.mock.calls.find(([command])=>command==='run_query')![1].query).toMatchObject({scope:['/notes/intro.txt'],references:['/notes/intro.txt']});
+ fileTab().click();await vi.waitFor(()=>expect(document.querySelector('.folder-browser')).not.toBeNull());await fileAction('搜索');
+ await vi.waitFor(()=>expect(document.querySelector('[aria-label="搜索关键词"]')).not.toBeNull());
+ const search=document.querySelector<HTMLInputElement>('[aria-label="搜索关键词"]')!;search.value='正文';search.dispatchEvent(new Event('input',{bubbles:true}));await tick();search.closest('form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));
+ await vi.waitFor(()=>expect(invoke.mock.calls.filter(([command])=>command==='run_query')).toHaveLength(2));
+ expect(invoke.mock.calls.filter(([command])=>command==='run_query')[1][1].query.scope).toEqual(['/notes/intro.txt']);
+});
+it('单文件从知识库移除后列表更新，撤销只恢复该文件',async()=>{
+ const base=invoke.getMockImplementation()!;let removed=false;
+ invoke.mockImplementation(async(command,args)=>{
+  if(command==='remove_root'){removed=true;return;}
+  if(command==='add_root'){removed=false;return '/notes';}
+  if(command==='list_removed_directories')return removed?['/notes/intro.txt']:[];
+  if(command==='list_files')return removed?files.slice(1):files;
+  const result=await base(command,args);
+  return command==='list_entries'&&removed?result.filter((entry:{path:string})=>entry.path!=='/notes/intro.txt'):result;
+ });
+ await start();fileTab().click();await vi.waitFor(()=>expect(document.querySelector('.folder-browser')).not.toBeNull());await open('/notes');
+ await fileAction('从知识库移除');
+ await vi.waitFor(()=>expect(document.querySelector('.simple-file-list [title="/notes/intro.txt"]')).toBeNull());
+ expect(invoke.mock.calls.find(([command])=>command==='remove_root')![1]).toEqual({path:'/notes/intro.txt'});
+ await vi.waitFor(()=>expect(document.querySelector('#notice')?.textContent).toContain('原文件保留'));
+ [...document.querySelectorAll<HTMLButtonElement>('#notice button')].find(button=>button.textContent==='恢复')!.click();
+ await vi.waitFor(()=>expect(document.querySelector('.simple-file-list [title="/notes/intro.txt"]')).not.toBeNull());
+ expect(invoke.mock.calls.find(([command])=>command==='add_root')![1]).toEqual({path:'/notes/intro.txt'});
+});
+
+it('总览空白区域支持导入，文件夹内部仅提供新建和接收，文件本身保留原菜单',async()=>{
+ const fallback=invoke.getMockImplementation()!;
+ invoke.mockImplementation(async(command,args)=>{
+  if(command==='get_settings')return{theme:'light',start_page:'ask',editor_size:15,answer:{url:'https://example.com',model:'test',models:['test']},jev:{url:'https://example.com',model:'test'},retrieval:{candidate_k:50,seed_k:10,expansion_term_limit:20,max_hops:1,top_k:10,chunk_chars:512},excluded:[]};
+  if(command==='get_share_settings')return{directory:'/Documents/super-sag/share',clipboard:true};
+  return fallback(command,args);
+ });
+ await start();fileTab().click();
+ await vi.waitFor(()=>expect(document.querySelector('.folder-browser')).not.toBeNull());
+ const blank=()=>document.querySelector<HTMLElement>('.folder-browser')!;
+ const openMenu=async()=>{blank().dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:500,clientY:450,cancelable:true}));await tick()};
+ await openMenu();
+ expect([...document.querySelectorAll('#context-menu .menu-item')].map(item=>item.textContent?.trim())).toEqual(['新建文档','导入数据','接收分享']);
+ [...document.querySelectorAll<HTMLElement>('#context-menu .menu-item')].find(item=>item.textContent?.trim()==='导入数据')!.click();
+ await vi.waitFor(()=>expect(document.querySelector('#add-data-tab-imports')?.getAttribute('aria-selected')).toBe('true'));
+ expect(document.querySelector('#add-data-panel-imports')?.textContent).toContain('Claude Code');
+ document.querySelector<HTMLButtonElement>('.folder-picker [aria-label="关闭"]')!.click();await tick();
+ await openMenu();
+ [...document.querySelectorAll<HTMLElement>('#context-menu .menu-item')].find(item=>item.textContent?.trim()==='接收分享')!.click();
+ await vi.waitFor(()=>expect(document.querySelector('.share-dialog .share-path')?.textContent).toBe('/Documents/super-sag/share'));
+ expect(document.querySelector('[role="tablist"]')).toBeNull();
+ document.querySelector<HTMLButtonElement>('.share-dialog [aria-label="关闭"]')!.click();await tick();
+ await open('/notes');
+ await openMenu();
+ expect([...document.querySelectorAll('#context-menu .menu-item')].map(item=>item.textContent?.trim())).toEqual(['新建文档','接收分享']);
+ [...document.querySelectorAll<HTMLElement>('#context-menu .menu-item')].find(item=>item.textContent?.trim()==='接收分享')!.click();
+ await vi.waitFor(()=>expect(document.querySelector('.share-dialog')).not.toBeNull());
+ expect(document.querySelector('[role="tablist"]')).toBeNull();
+ await vi.waitFor(()=>expect(document.querySelector('.share-dialog .share-path')?.textContent).toBe('/notes'));
+ expect(invoke.mock.calls.some(([command])=>command==='save_share_settings')).toBe(false);
+ document.querySelector<HTMLButtonElement>('.share-dialog [aria-label="关闭"]')!.click();await tick();
+ document.querySelector<HTMLElement>('.simple-file-entry [title="/notes/nested"]')!.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:500,clientY:300,cancelable:true}));await tick();
+ expect(document.querySelector('#context-menu')?.textContent).toContain('索引设置');
+ expect(document.querySelector('#context-menu')?.textContent).not.toContain('新建文档');
+});

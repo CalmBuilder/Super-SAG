@@ -1,0 +1,104 @@
+// Documentation fixtures: real UI components with an isolated, in-memory service.
+// No API keys, filesystem access, network model calls, or real user data.
+import {mount} from 'svelte';
+import '../src/tokens.css';
+import '../src/prototype.css';
+import '../src/app.css';
+import '../src/native.css';
+import '../src/components/settings.css';
+import '../src/components/ui/controls.css';
+import '../src/styles/search.css';
+import {setLanguage} from '../src/lib/i18n';
+import {version} from '../package.json';
+import type {ChatImportSchedule,ChatSource} from '../src/lib/types';
+const params=new URLSearchParams(location.search),en=params.get('lang')==='en';
+const text=(zh:string,eng:string)=>en?eng:zh;
+const root='/Documents/Super-SAG/'+text('项目资料','Project notes');
+const names=[text('发布流程.md','Release guide.md'),text('会议纪要.md','Meeting notes.md'),text('项目笔记.md','Project notes.md')];
+const body=text('# 新项目发布流程\n\n## 发布前的准备\n\n发布前，先完成自动测试与人工验收，再逐项检查发布清单。所有阻塞问题解决后，由项目负责人确认发布窗口。\n\n## 发布清单\n\n| 准备工作 | 负责团队 |\n| --- | --- |\n| 自动测试与使用流程验收 | 工程团队 |\n| 更新说明与使用指南 | 产品团队 |\n| 回退方案与反馈渠道 | 运维团队 |\n\n> 核对原文上下文，再确认发布安排。\n\n## 发布与跟进\n\n发布采用分阶段开放。先向内部试用，再逐步扩大范围。记录反馈，优先处理影响核心流程的问题。\n\n## 后续行动\n\n- 更新使用指南\n- 收集试用反馈\n- 安排下一次评审\n', '# Project release guide\n\n## Before release\n\nBefore release, complete automated tests and acceptance checks, then review the release checklist. Once blockers are resolved, the project owner confirms the release window.\n\n## Release checklist\n\n| Preparation | Owner |\n| --- | --- |\n| Tests and workflow acceptance | Engineering |\n| Release notes and user guide | Product |\n| Rollback plan and feedback channels | Operations |\n\n> Read the source context before confirming the release plan.\n\n## Rollout and follow-up\n\nRelease in stages: start with an internal trial, then expand access. Record feedback and prioritize issues affecting core workflows.\n\n## Next steps\n\n- Update the user guide\n- Collect trial feedback\n- Schedule the next review\n');
+const docs=names.map((name,i)=>({id:i+1,name,path:root+'/'+name,body:i===0?body:body.replace(/^# .+/,`# ${name.replace('.md','')}`),hash:'demo-'+i}));
+if(params.has('progressive'))docs.push({...docs[0],id:4,name:text('扫描档案.pdf','Scanned archive.pdf'),path:root+'/scan.pdf'});
+const longFoldUrl='https://example.com/reports/'+'enterprise'.repeat(35);
+if(params.has('fold-long-token'))docs[0].body=`# Long link card\n\n[URL Source: ${longFoldUrl}](${longFoldUrl})\n\n## Second section\n\nThe adjacent card stays readable.`;
+if(params.get('diagram')==='1') docs[0].body=text('# 发布流程图\n\n```mermaid\nflowchart LR\n A[添加资料] --> B[索引] --> C[检索] --> D[核对原文]\n```\n','# Release workflow\n\n```mermaid\nflowchart LR\n A[Add files] --> B[Index] --> C[Search] --> D[Read source]\n```\n');
+if(params.has('large-reader')){
+ const paragraph=text('发布前，先完成自动测试与人工验收，再核对发布材料、回退方案和用户指南。负责人记录每项检查的结果，确认所有阻塞问题已经解决。','Before release, complete automated tests and acceptance checks, then review the release materials, rollback plan and user guide. The owner records each result and confirms that blocking issues are resolved.');
+ const topics=en?['Preparation','Acceptance checks','Release materials','Staged rollout','Trial feedback']:['发布准备','功能验收','发布材料','分阶段发布','试用反馈'];
+ const introduction=text('负责人先核对本次发布的功能范围，为每项验收安排明确的责任人。自动测试通过后，仍需检查安装、文件导入、搜索和文档阅读这些完整操作。\n\n发布材料应包含更新说明、用户指南和回退方案。中英文说明使用同一套示例资料，确保按钮名称、操作顺序和截图与实际界面一致。\n\n确认阻塞问题已经解决后，再安排分阶段开放。试用期间持续记录反馈，将需要跟进的问题放入下一轮检查清单。','The owner first confirms the release scope and assigns a person to each acceptance check. After automated tests pass, check the complete installation, file import, search and document reading flows.\n\nPrepare release notes, a user guide and a rollback plan. Use the same example material for Chinese and English instructions so that button names, steps and screenshots agree with the actual interface.\n\nOnce blocking issues are resolved, arrange a staged rollout. Record trial feedback and carry follow-up issues into the next checklist.');
+ docs[0].body=text('# 项目发布手册\n\n这份示例手册用于展示长文档的目录、查找和阅读操作。\n\n','# Project release handbook\n\nThis example handbook demonstrates navigation, find and reading in a long document.\n\n')+Array.from({length:260},(_,i)=>`## ${i+1}. ${topics[i%topics.length]}\n\n${i===0?introduction:Array(8).fill(paragraph).join(' ')}\n\n### ${text('本章检查清单','Chapter checklist')}\n\n${text('- 核对原文与验收结果\n- 更新中英文用户指南\n- 记录试用反馈与后续行动','- Review source material and acceptance results\n- Update the Chinese and English user guides\n- Record trial feedback and follow-up actions')}\n\n`).join('');
+ docs[0].hash='demo-large-reader';
+}
+if(params.get('many')==='1')for(let i=4;i<=36;i++)docs.push({...docs[0],id:i,name:text('项目笔记','Project notes')+' '+i+'.md',path:root+'/note-'+i+'.md',hash:'demo-'+i});
+const evidence=docs.map((d,i)=>({id:i+1,document_id:d.id,path:d.path,title:d.name,heading:text('发布前的准备','Before release'),content:d.body.split('\n\n')[2]||d.body,start_line:5,end_line:5,source_ranges:[],bm25:1,score:0.94-i*.08,order:i,hash:d.hash}));
+const related=docs[0].body.split('\n\n')[7]||evidence[0].content;
+const relatedLine=docs[0].body.slice(0,docs[0].body.indexOf(related)).split('\n').length;
+evidence.push({...evidence[0],id:100,content:related,start_line:relatedLine,end_line:relatedLine+related.split('\n').length-1});
+const question=text('新项目发布前，需要完成哪些准备？','What should we prepare before a project release?');
+const answer=text('发布前，请完成以下准备：\n\n1. **通过测试与验收**：完成自动测试，并验收主要使用流程。[1]\n2. **备齐发布材料**：准备更新说明、回退方案，并同步使用指南。[2]\n3. **确认发布安排**：解决阻塞问题，确认发布窗口，再分阶段开放试用。[3]\n\n| 阶段 | 产出 |\n| --- | --- |\n| 准备 | 测试结果与发布清单 |\n| 发布 | 使用指南与回退方案 |\n| 跟进 | 用户反馈与行动项 |','Before release, complete these preparations:\n\n1. **Verify quality**: finish automated tests and acceptance checks for core workflows. [1]\n2. **Prepare release materials**: update release notes, the rollback plan, and the user guide. [2]\n3. **Confirm the rollout**: resolve blockers, agree on the release window, and expand access in stages. [3]\n\n| Stage | Deliverable |\n| --- | --- |\n| Prepare | Test results and checklist |\n| Release | User guide and rollback plan |\n| Follow up | Feedback and action items |');
+const now=Date.now();
+const conversation={id:'release-demo',title:question,updated:now,deleted:false,messages:[{created_at:now-60000,question,answer,evidence,model:'demo-model',scope:[],references:[],status:'complete',error:null,retrieval_question:question,context:{elapsed_ms:12400,limit:65536,reserved_output:2048,estimated_input:1250,omitted_sources:0,omitted_history:0,input_tokens:1250,output_tokens:240},tool_calls:[{id:'search',answer_offset:0,query:JSON.stringify({query:question}),source_count:3,elapsed_ms:320,server_name:'SAG',tool_name:'search',result:{documents:3}},{id:'read',answer_offset:0,query:JSON.stringify({path:docs[0].path}),source_count:1,elapsed_ms:24,server_name:'SAG',tool_name:'read',result:body}]}]};
+const partial=params.get('partial')==='1';
+const roots=[{path:root,name:text('项目资料','Project notes'),status:params.has('progressive')?'indexing':partial?'partial':'ready',count:params.has('progressive')?3:docs.length,error:partial?text('未能索引 1 个文件\n文件无法读取','Could not index one file\nUnable to read the file'):null}];
+let chatImportFolder='/Documents/super-sag/agent-history';
+const settings={theme:'light',language:en?'en':'zh-CN',start_page:params.get('start')||'ask',editor_size:15,search_summary_enabled:true,search_summary_sources:10,answer:{model:'demo-model',models:['demo-model'],url:'https://api.example.com/v1',has_key:true},jev:{model:'jev-latest',models:[],url:'https://api.302ai.cn/typesafeai/v1',has_key:true,auth_mode:'bearer'},retrieval:{candidate_k:50,seed_k:10,expansion_term_limit:20,max_hops:1,top_k:10,chunk_chars:512},watch:true,show_hidden:false,excluded:[],timeout_secs:120,answer_context_tokens:65536,answer_output_tokens:2048,model_profiles:{'demo-model':{system_prompt:'',sag2_enabled:true,mcp_servers:['example']}},mcp_servers:[{id:'example',name:'Example Docs',transport:'http',url:'https://mcp.example.com',command:'',args:[],require_confirmation:true,has_credentials:false,tools:[{name:'read_document',description:'Read a documentation page'}]}]};
+const history=[{id:3,path:root,name:roots[0].name,started_at:now-3600000,finished_at:now-3590000,completed:3,total:4,status:'partial',error:text('未能读取部分文件，请检查文件权限。','Some files could not be read. Check file permissions.')},{id:2,path:root,name:roots[0].name,started_at:now-86400000,finished_at:now-86390000,completed:3,total:3,status:'ready',error:null}];
+const docling={installed:false,running:false,stage:'idle',message:'',downloaded:0,total:null,packages_done:null,packages_total:null,error:null,formats:[],builtin_formats:[['Documents',['pdf','docx','xlsx','epub']]],profiles:[]};
+// Catalog from the desktop Docling status response, with neither component installed.
+if(params.has('docling-formats'))Object.assign(docling,{
+ builtin_formats:[["PDF",["pdf"]],["Word",["docx","docm","doc","rtf"]],["PowerPoint",["pptx","ppsx","pptm","ppsm","ppt","pot","pps"]],["Excel / CSV",["xlsx","xlsm","xlsb","xls","csv"]],["OpenDocument",["odt","ods","odp"]],["电子书与邮件",["epub"]]],
+ formats:[["PDF",["pdf"]],["Word",["dotx","dotm","dot"]],["PowerPoint",["potx","potm"]],["Excel / CSV",["xltx","xltm","xlt"]],["OpenDocument",["ott","ots","otp"]],["Apple iWork",["pages","key","numbers"]],["图片与扫描件（OCR）",["jpg","jpeg","png","tif","tiff","bmp","webp","gif"]],["网页与文本",["xhtml","mhtml","mht","text","qmd","rmd","adoc","asciidoc","asc","vtt","tex","latex"]],["电子书与邮件",["eml","msg","boxnote"]],["音频",["wav","mp3","m4a","aac","ogg","flac"]],["视频",["mp4","avi","mov","mkv","webm"]],["结构化文档",["nxml","xbrl","dclg","dclx","tar.gz","ebc","ebcdic","afp"]]],
+ profiles:[{"id":"documents","installed":false,"extensions":["pdf","dotx","dotm","dot","potx","potm","xltx","xltm","xlt","ott","ots","otp","pages","key","numbers","jpg","jpeg","png","tif","tiff","bmp","webp","gif","xhtml","mhtml","mht","text","qmd","rmd","adoc","asciidoc","asc","vtt","tex","latex","eml","msg","boxnote","nxml","xbrl","dclg","dclx","tar.gz","ebc","ebcdic","afp"]},{"id":"media","installed":false,"extensions":["wav","mp3","m4a","aac","ogg","flac","mp4","avi","mov","mkv","webm"]}],
+});
+const graphDocs=docs.map(({body,...d})=>({...d,file_type:'md'}));
+const graphEdges=[{source:1,target:2,source_hash:'demo-0',target_hash:'demo-1',score:.76,terms:[text('发布','release')],snapshot:'demo'},{source:1,target:3,source_hash:'demo-0',target_hash:'demo-2',score:.64,terms:[text('测试','tests')],snapshot:'demo'}];
+const callbacks=new Map<number,(value:any)=>void>(),listeners=new Map<number,{event:string;handler:number}>();let nextCallback=0;
+const apiDemoKey={id:'demo-key',name:text('知识库助手','Knowledge assistant'),prefix:'sag_demo…0001',created_at:now,copyable:true};
+function fixtureEvent(event:string,payload:unknown){for(const [id,listener] of listeners)if(listener.event===event)callbacks.get(listener.handler)!({event,id,payload});}
+const chatSessions=[{id:'release-chat',title:text('确认发布检查流程','Confirm the release checklist'),project:'/Projects/Atlas',updated:'2026-11-15T01:00:00Z',paths:['/Example/transcripts/release.jsonl']},{id:'search-chat',title:text('搜索结果排序调整','Search ranking adjustments'),project:'/Projects/Atlas',updated:'2026-11-14T09:30:00Z',paths:['/Example/transcripts/search.jsonl']}];
+const schedules:Partial<Record<ChatSource,ChatImportSchedule>>={};
+const handlers:Record<string,(a:any)=>any>={
+ browse_folders:({path})=>({path:path??'/Documents',parent:'/',home:'/Documents',folders:[{path:'/Documents/Project notes',name:text('项目资料','Project notes')},{path:'/Documents/Research',name:text('研究资料','Research')},{path:'/Documents/Archive',name:text('归档','Archive')}]}),
+ list_chat_sessions:()=>({source_root:'/Example/transcripts',sessions:chatSessions,issues:[],total:2,page:0,page_size:50,projects:['/Projects/Atlas']}),
+ preview_chat_import:(a)=>({title:chatSessions[0].title,body:text('# 确认发布检查流程\n\n## User\n\n发布前需要检查哪些内容？\n\n## Assistant\n\n先完成自动测试，再核对安装、搜索和文档阅读流程。\n\n1. 验证安装和启动。\n2. 导入示例文件，检查搜索结果。\n3. 核对中英文操作说明。',' # Confirm the release checklist\n\n## User\n\nWhat should we check before release?\n\n## Assistant\n\nRun automated tests, then check installation, search and document reading.\n\n1. Verify installation and startup.\n2. Import example files and inspect search results.\n3. Check the Chinese and English instructions.')+(a.includeTools?'\n\n## Tool\n\n```\nnpm test\n```':'')}),
+ get_chat_import_folder:()=>chatImportFolder,
+ get_chat_import_schedule:({source}:{source:ChatSource})=>({schedule:schedules[source]??{enabled:false,time:'09:00',source_root:null,include_tools:false},last_run_at:null,last_run:null}),
+ save_chat_import_schedule:({source,schedule}:{source:ChatSource;schedule:ChatImportSchedule})=>{schedules[source]=schedule;},
+ choose_chat_import_folder:()=>chatImportFolder='/Documents/'+text('自选聊天目录','Custom Chats'),
+ import_chat_sessions:(a)=>a.sessions.map((s:any)=>({path:chatImportFolder+'/'+(a.source==='claude'?'claude code':'codex')+'/'+s.title+'.md',status:'imported',error:null})),
+ list_answer_models:()=>['demo-model','demo-model-fast','demo-model-reasoning'],
+ runtime_schema:()=>JSON.stringify({defaults:{},fields:[]}),
+ manage_api:({action})=>action.action==='list_keys'?[apiDemoKey]:action.action==='copy_key'?{key:'sag_demo_not_a_real_key'}:action.action==='web_code'?{code:'demo-web-access-code'}:{enabled:true,running:true,web_enabled:params.has('web-service'),web_running:params.has('web-service'),host:'0.0.0.0',port:24681,local_url:'http://127.0.0.1:24681',lan_urls:['http://192.168.1.10:24681'],key_count:1,autostart:false,last_error:null},
+ fold_document:async a=>{
+  fixtureEvent('document-fold-progress',{id:a.id,stage:'preparing',percent:0});
+  if(params.has('fold-loading'))await new Promise(()=>{});
+  for(const [stage,percent] of [['generating',33],['summarizing',67]]){await new Promise(resolve=>setTimeout(resolve,250));fixtureEvent('document-fold-progress',{id:a.id,stage,percent});}
+  if(params.has('fold-progress'))await new Promise(()=>{});
+  fixtureEvent('document-fold-progress',{id:a.id,stage:'complete',percent:100});
+  return {units:a.document.sections.flatMap((s:any)=>s.units.map((u:any)=>({id:u.id,evidence:[0],key:u.sentences[0],takeaway:u.sentences[0],topic:params.has('fold-long-token')&&u.id===0?longFoldUrl:en?['Release materials','Source context','Staged rollout','User guide','Trial feedback','Next review'][u.id]||s.title:['发布材料','上下文核对','分阶段发布','使用指南','试用反馈','评审安排'][u.id]||s.title,role:'claim',local:false,suppressed:false,hide_takeaway:false}))),sections:a.document.sections.filter((s:any)=>s.units.length||s.tables.length).map((s:any)=>({id:s.id,takeaway:s.title,topic:s.title})),warnings:[]};},
+ explore_overview:()=>({scope:root,version:1,total:docs.length,documents:graphDocs,known_documents:graphDocs,indexing:false,partial:false}),explore_graph:()=>({scope:root,version:1,snapshot:'demo',documents:graphDocs,edges:graphEdges}),
+ retry_failed_indexes:async()=>{await new Promise(resolve=>setTimeout(resolve,1200));roots[0].status='ready';roots[0].error=null;return roots;},
+ get_settings:()=>structuredClone(settings),list_roots:()=>roots,list_files:()=>docs.filter(d=>!params.has('progressive')||d.id!==4).map(({body,...d},i)=>params.has('progressive')?{...d,index_status:['basic','enhancing','enhancement_failed'][i%3],index_error:i%3===2?text('OCR 超时，基础文本已保留。','OCR timed out; basic text was retained.'):null}:d),list_entries:()=>docs.map(d=>({path:d.path,name:d.name,directory:false,symlink:false})),get_index_status:()=>({paused:false,conversion_states:params.has('progressive')?[{source:root+'/scan.pdf',root,status:'awaiting_ocr',searchable:false,error:null}]:[],failed_files:roots[0].status==='partial'?1:0,tasks:params.has('progressive')?[{path:root,stage:'enhancing',completed:1,total:3,files:[docs[1].path]}]:[]}),list_drafts:()=>[],list_removed_directories:()=>[],list_notes:()=>[],list_conversations:()=>[conversation,{...conversation,id:'previous',title:text('如何收集试用反馈？','How do we collect trial feedback?'),updated:now-86400000}],get_conversation:()=>conversation,read_document:a=>docs.find(d=>d.path===a.path)||docs[0],get_index_history:()=>history,get_index_history_log:()=>({raw:docs.map(d=>JSON.stringify({time:now,path:d.path,stage:'indexing',status:'complete',error:null})).join('\n')+'\n'+JSON.stringify({time:now,path:root+'/archive.pdf',stage:'converting',status:'failed',error:'File cannot be read'})}),
+ run_query:()=>({terms:[text('发布','release')],elapsed_ms:120,results:evidence,pagination:null,trace:[],conversation}),summarize_search:()=>({text:answer,evidence,context:conversation.messages[0].context}),get_docling_status:()=>docling,docling_status:()=>docling,get_cli_settings:()=>({skill_url:'http://127.0.0.1:24680/super-sag.md',access:{enabled:true},installations:['claude-code','codex','opencode'].map(name=>({name,path:'',installed:false,version:null}))}),get_web_clipper:()=>({packages:['chrome','safari']}),get_folder_index_options:()=>({file_types:{markdown:true,text:true,code:false,config:false},convert_other_formats:false,conversion_formats:[]}),check_updates:()=>({current_version:version,latest_version:version,available:false,notes:'',download_url:null}),check_app_update:()=>({current_version:version,latest_version:params.has('update')?'0.2.6':version,available:params.has('update'),notes:text('## 0.2.6\n\n- **快捷搜索**：新增独立搜索窗口，支持全局快捷键和键盘操作。\n- **跨语言检索**：使用自然语言提问，保留原问题的条件与限定。\n- **更新说明**：支持标题、列表、`代码`和[使用指南](https://github.com/CalmBuilder/Super-SAG)。','## 0.2.6\n\n- **Quick Search**: Open a dedicated search window with a global shortcut and keyboard controls.\n- **Cross-language search**: Ask naturally while preserving the original constraints.\n- **Release notes**: Read headings, lists, `code` and the [user guide](https://github.com/CalmBuilder/Super-SAG).'),download_url:null}),
+};
+Object.assign(handlers,{
+ prepare_note_import:(args:any)=>{if(params.has('note-permission')&&args.source==='apple')throw 'APPLE_NOTES_PERMISSION_REQUIRED';return ({session:123,destination:'/Documents/super-sag/notes/Notion',folders:[{ID:2,NAME:text('工作笔记','Work notes')}]});},
+ choose_note_import_folder:()=>'/Documents/super-sag/notes',
+ close_note_import:()=>null,
+ write_note_import_file:()=>null,
+ read_note_import_files:()=>[],
+ finish_note_import:()=>'/Documents/super-sag/notes/Notion',
+});
+(window as any).__TAURI_INTERNALS__={metadata:{currentWindow:{label:'main'},currentWebview:{windowLabel:'main',label:'main'}},invoke:async(command:string,args:any={})=>{
+ if(command==='plugin:event|listen'){const id=++nextCallback;listeners.set(id,{event:args.event,handler:args.handler});return id;}
+ if(command==='plugin:event|unlisten'){listeners.delete(args.eventId);return;}
+ return handlers[command]?handlers[command](args):command.startsWith('plugin:')?0:null;
+},transformCallback:(callback:(value:any)=>void)=>{const id=++nextCallback;callbacks.set(id,callback);return id;},unregisterCallback:(id:number)=>callbacks.delete(id),convertFileSrc:(path:string)=>path};
+(window as any).__TAURI_EVENT_PLUGIN_INTERNALS__={unregisterListener:(_event:string,id:number)=>{const listener=listeners.get(id);if(listener)callbacks.delete(listener.handler);listeners.delete(id);}};
+localStorage.clear();localStorage.setItem('sag.onboarding.seen','1');localStorage.setItem('sag.search.mode','search');setLanguage(en?'en':'zh-CN');
+const {default:App}=await import('../src/App.svelte');mount(App,{target:document.getElementById('app')!});
+
+if(params.has('offline-component')){
+ Object.assign(docling,{stage:'error',error:text('下载连接超时，请重试或导入离线组件。','Download connection timed out. Retry or import an offline component.'),formats:[['PDF',['pdf']]],profiles:[{id:'documents',installed:false,extensions:['pdf']}]});
+ const {openDoclingDownload}=await import('../src/lib/docling');
+ openDoclingDownload(['documents'],['pdf'],async()=>{});
+}

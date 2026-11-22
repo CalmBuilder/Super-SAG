@@ -1,0 +1,82 @@
+---
+title: "Agents"
+description: "Give your agent access to Super-SAG project search."
+---
+
+## One setup instruction
+
+Send this entire instruction to Claude Code, Codex or OpenCode:
+
+```text
+Install https://github.com/CalmBuilder/Super-SAG/blob/main/cli/skills/sag/SKILL.md and follow its setup flow for my current project.
+```
+
+The Skill guides the agent through checking the CLI, installing all Skill files, configuring Jev, adding the current project and verifying a search. The desktop app is optional.
+
+The Skill also covers [sharing and receiving files](/en/docs/file-sharing) with `super-sag share` and `super-sag download`, including adding received content to the knowledge base when requested. Sharing and receiving do not require Jev configuration.
+
+For projects that connect through MCP, the Skill guides the agent through [limiting an API key to project folders](/en/docs/cli#api-key-folder-scopes) and [exporting the matching MCP configuration](/en/docs/mcp-guide#export-configuration-with-the-cli).
+
+<Callout title="API key setup">Semantic search requires a Jev API key. Enter it in a local interactive terminal, never in chat.</Callout>
+
+## Install the CLI manually
+
+Initialize the bundled CLI from the desktop app; a standalone npm package has not been published.
+
+```sh
+super-sag --version
+super-sag
+```
+
+Running `super-sag` for the first time guides Jev setup. Existing installations and settings are reused.
+
+## Use it in your project
+
+```sh
+super-sag add --types md,txt,html,py,js,ts,tsx,json,yaml
+super-sag check
+super-sag "How does this project handle login and permissions?" . -m 5
+```
+
+Adjust `--types` to match your project. Wait for indexing before searching. Results identify files, source locations and relevant content that the agent can read further.
+
+## Skill locations
+
+| Agent | User-level directory |
+| --- | --- |
+| Codex | `~/.agents/skills/super-sag/` |
+| Claude Code | `~/.claude/skills/super-sag/` |
+| OpenCode | `~/.config/opencode/skills/super-sag/` |
+
+Include `SKILL.md` and all companion files under `references/`. Use the [GitHub Skill](https://github.com/CalmBuilder/Super-SAG/tree/main/cli/skills/sag) as the canonical source.
+
+## Shared with the desktop app
+
+Agents call Super-SAG through the CLI. Desktop and CLI share configuration, folders and indexes, so indexing is not duplicated. Retrieving relevant passages can reduce the need to put entire documents in context. Actual token use and efficiency depend on the task and agent workflow.
+
+## CLI settings in the desktop app
+
+
+Click the **CLI** code icon at the top right of the desktop app, or open **Settings → CLI settings**.
+
+| Item | Purpose | Usage |
+| --- | --- | --- |
+| Enable CLI | Allow CLI access to the shared local service | First desktop launch installs and enables it. Save after changing the switch. |
+| Test connection | Check CLI-to-service connectivity | Save switch changes first. Connectivity does not prove project indexing is complete. |
+| Install for Claude Code / Codex / OpenCode | Install that agent's Super-SAG Skill | Select Install; installed integrations can be removed. Start a new agent session to load the Skill. |
+| Copy installation command | Copy the corresponding `super-sag install` command | Run it locally or give it to the agent. |
+| Other | Copy a local Skill setup instruction | Use the copy button beside the code block and send it to an agent on the same computer. |
+| Skill installation guide | Show setup steps and the actual location | Expand to inspect where files are installed. |
+| CLI usage guide | Basic commands, project scope and status checks | See the full [CLI reference](/en/docs/cli). |
+
+The **Other** row says “Copy the instruction below and send it to your agent to complete setup.” Use the copy icon beside the code block. The instruction uses the actual port shown in settings:
+
+```text
+set up: http://127.0.0.1:PORT/super-sag.md
+```
+
+The agent can read this link and its companion documents while reusing the local CLI and configuration. Keep the local service running; copy the current link again after restarting the service.
+
+No separate per-folder CLI authorization selection is required. Search still covers only indexed content beneath the current path and respects exclusions. Disabling CLI affects agent access without deleting originals or indexes.
+
+When installing from GitHub, follow the linked current setup flow and fetch every Skill file. A desktop-bundled Skill is a snapshot shipped with that app version.

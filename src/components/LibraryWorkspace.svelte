@@ -1,0 +1,109 @@
+<script lang="ts">
+ import {displayPath,inside} from '../lib/domain';
+ import {fileIndexState,indexStage} from '../lib/index-stages';
+ import type {ConversionState,IndexTask} from '../lib/types';
+ import {Button} from 'bits-ui';
+ import ExploreView from './ExploreView.svelte';
+ import LibraryStats from './LibraryStats.svelte';
+ import WebLibraryActions from './WebLibraryActions.svelte';
+ import Modal from './ui/Modal.svelte';
+ import {indexTaskKey} from '../lib/stable-snapshot';
+ import {t} from '../lib/i18n';import {icon} from '../lib/icons';import {basename,indexedSourcePath} from '../lib/domain';
+ import type {Entry,FileInfo,Root,NoteSummary} from '../lib/types';import type {LibrarySession} from '../lib/explore';
+ import '../styles/explore.css';
+ export let scope:string;export let session:LibrarySession;export let entries:Entry[];export let reading:boolean;export let revision:number;
+ export let totalFiles:number|undefined=undefined;
+ export let indexedFiles:FileInfo[]=[];
+ export let notes:NoteSummary[]=[];
+ export let roots:Root[]=[];
+ export let indexTasks:IndexTask[]=[];
+ export let conversionStates:ConversionState[]=[];
+ export let indexPaused=false;
+ export let showIndexDetails=false;
+ $:scopeRoot=scope?roots.filter(root=>inside(scope,displayPath(root.path))).sort((a,b)=>b.path.length-a.path.length)[0]:undefined;
+ $:scopeTasks=scopeRoot?indexTasks.filter(task=>task.path===scopeRoot.path).sort((a,b)=>Number(a.kind==='enhancement')-Number(b.kind==='enhancement')):[];
+ $:scopeTask=scopeTasks[0];
+ $:scopeState=indexPaused&&(scopeTask||scopeRoot?.status==='pending')?'索引已暂停':scopeTask?(indexStage(scopeTask.stage)?.progress??'正在扫描文件'):scopeRoot?.status==='pending'||scopeRoot?.status==='indexing'?'等待后台处理':scopeRoot?.status==='error'?'索引失败':scopeRoot?.status==='partial'?'部分文件索引失败':'索引已完成';
+ export let onIndexDetails:(()=>void)|undefined=undefined;
+ export let onPauseChange:((paused:boolean)=>void)|undefined=undefined;
+ export let parent='';
+ export let oncreate:(()=>void)|undefined=undefined;
+ export let onBlankMenu:((event:MouseEvent)=>void)|undefined=undefined;
+ export let onadd:(()=>void)|undefined=undefined;
+ export let webFolder:{path:string;canUpload:boolean}|undefined=undefined;
+ export let creatingWebFolder=false;
+ export let onWebFolderCreated:((path:string)=>Promise<void>)|undefined=undefined;
+ export let onWebUploaded:(()=>Promise<void>)|undefined=undefined;
+ export let onModeChange:(()=>void)|undefined=undefined;
+ export let onSettings:(()=>void)|undefined=undefined;
+ let conversionPrompt=false,fileFilter='all',promptPath='';
+ // Index issues are reported per root as "path\nerror" pairs; find this file's reason.
+ function issueFor(path:string):string{
+  for(const root of roots){
+   if(!root.error||!path.startsWith(root.path))continue;
+   const lines=root.error.split('\n');
+   const at=lines.indexOf(path);
+   if(at>=0&&at+1<lines.length)return lines[at+1];
+  }
+  return '';
+ }
+ $:promptIssue=promptPath?issueFor(promptPath):'';
+ $:promptProcessing=!!scopeTask||scopeRoot?.status==='pending'||scopeRoot?.status==='indexing';
+ $:promptNeedsOcr=/OCR/.test(promptIssue);
+ export let onbrowse:(path:string)=>void;export let onopen:(path:string,terms:string[])=>void;export let onmenu:(event:MouseEvent,path:string,isRoot:boolean,file:boolean)=>void;
+ $:indexedPaths=new Set(indexedFiles.flatMap(file=>[file.path,indexedSourcePath(file.path,file.source_path)]));
+ $:indexedByPath=new Map(indexedFiles.flatMap(file=>[[file.path,file],[indexedSourcePath(file.path,file.source_path),file]] as const));
+ $:conversionByPath=new Map(conversionStates.map(state=>[state.source,{index_status:state.status as FileInfo['index_status'],index_error:state.error,searchable:state.searchable}]));
+ $:noteByPath=new Map(notes.map(note=>[note.path,note]));
+ const attention=(note:NoteSummary)=>note.state==='changed'||note.state==='missing'||note.state==='unverified';
+ $:scopeAttention=!!scope&&entries.some(entry=>!entry.directory&&!!noteByPath.get(entry.path)&&attention(noteByPath.get(entry.path)!));
+ function folderAttention(path:string){const prefix=path.replace(/[\\/]$/,'')+(path.includes('\\')?'\\':'/');return notes.filter(note=>note.path.startsWith(prefix)&&attention(note)).length;}
+ $:visibleEntries=entries.filter(entry=>!scope||entry.directory||fileFilter==='all'||(fileFilter==='indexed'?indexedPaths.has(entry.path):fileFilter==='notes'?!!noteByPath.get(entry.path)&&attention(noteByPath.get(entry.path)!):!indexedPaths.has(entry.path)));
+ function blankMenu(event:MouseEvent){
+  const target=event.target as Element;
+  if(!onBlankMenu||target.closest('.simple-file-entry,button,a,input,textarea,select'))return;
+  if(target!==event.currentTarget&&!target.closest('.simple-file-list,.empty'))return;
+  event.preventDefault();event.stopPropagation();onBlankMenu(event);
+ }
+ function restoreScroll(node:HTMLElement){node.scrollTop=session.fileScroll;return{destroy(){session.fileScroll=node.scrollTop}}}
+</script>
+<div class="library-workspace">
+ {#if session.mode==='explore'}<div class="library-explore-heading"><Button.Root class="library-mode-back" onclick={()=>{session.mode='files';onModeChange?.()}}>{@html icon('back')}{$t('返回文件树模式')}</Button.Root><h1>{basename(scope)}</h1>{#if oncreate}<Button.Root class="outline library-folder-action" onclick={oncreate}>{@html icon('plus')}{$t('新建文档')}</Button.Root>{/if}</div><ExploreView {scope} {session} {revision} {onopen}/>{:else}
+ <div class="page-wrap folder-browser library-files" role="region" aria-label={$t('文件列表')} tabindex="-1" oncontextmenu={blankMenu} use:restoreScroll onscroll={(e)=>{session.fileScroll=e.currentTarget.scrollTop}}>
+  <div class="page-heading"><div class="library-folder-heading"><div class="library-folder-title" class:web-library-title={!!webFolder}><h1>{scope?basename(scope):$t('已索引文件')}</h1>{#if scope}<Button.Root type="button" class="library-explore" onclick={()=>{session.mode='explore';onModeChange?.()}}>{$t('探索模式')}</Button.Root>{/if}<div class="library-folder-actions" class:web-library-actions={!!webFolder}>{#if webFolder&&onWebFolderCreated&&onWebUploaded}<WebLibraryActions folder={webFolder.path} canUpload={webFolder.canUpload} bind:creating={creatingWebFolder} onCreated={onWebFolderCreated} onUploaded={onWebUploaded} onCreateDocument={oncreate}/>{:else if oncreate}<Button.Root class="outline library-folder-action" onclick={oncreate}>{@html icon('plus')}{$t('新建文档')}</Button.Root>{/if}{#if !scope&&onadd}<Button.Root class="outline library-folder-action" onclick={onadd}>{@html icon('plus')}{$t('添加文件夹')}</Button.Root>{/if}</div></div><div class="library-folder-meta"><p class="folder-count">{!scope&&totalFiles!==undefined?$t('{value0} 个文件夹 · {value1} 个已索引文件',{value0:entries.length,value1:totalFiles}):$t('{value0} 个文件夹 · {value1} 个文件',{value0:entries.filter(e=>e.directory).length,value1:visibleEntries.filter(e=>!e.directory).length})}</p>{#if scope}<Button.Root type="button" class="library-file-filter" aria-label={$t('按索引状态筛选')} onclick={()=>fileFilter=fileFilter==='all'?'indexed':fileFilter==='indexed'?'unindexed':fileFilter==='unindexed'&&scopeAttention?'notes':'all'}><span>{$t(fileFilter==='all'?'全部':fileFilter==='indexed'?'已索引':fileFilter==='unindexed'?'未索引':'待核对笔记')}</span>{@html icon('switch')}</Button.Root>{/if}</div></div></div>
+  {#if !scope}<LibraryStats files={indexedFiles} {roots} {revision} onDetails={onIndexDetails} {onPauseChange}/>{/if}
+  {#if showIndexDetails&&scopeRoot}<div class="folder-index-status" role="status" aria-live="polite">
+   <div><strong>{$t(scopeState)}</strong>{#if scopeTask&&scopeTask.total>0}<span class="folder-index-count">{scopeTask.completed} / {scopeTask.total}</span>{/if}
+    {#if scopeTask?.files.length}<p>{$t('正在处理：{value0}',{value0:scopeTask.files.map(basename).join('、')})}</p>
+    {:else if scopeState==='等待后台处理'}<p>{$t(indexTasks.length?'后台正在处理其他文件夹，完成后会继续处理此文件夹。':'文件夹已加入处理队列，即将开始扫描。')}</p>
+    {:else if scopeState==='索引已完成'}<p>{$t('已索引 {value0} 个文件',{value0:scopeRoot.count})}</p>{/if}
+    {#if scopeTask&&scopeTask.total>0}<progress aria-label={$t('当前阶段进度')} max={scopeTask.total} value={scopeTask.completed}></progress>{/if}
+    {#each scopeTasks.slice(1) as task (indexTaskKey(task))}<div class="folder-extra-task"><p><strong>{$t(indexStage(task.stage)?.progress??'正在扫描文件')}</strong>{#if task.total>0}<span class="folder-index-count">{task.completed} / {task.total}</span>{/if}</p>{#if task.files.length}<p>{$t('正在处理：{value0}',{value0:task.files.map(basename).join('、')})}</p>{/if}{#if task.total>0}<progress aria-label={$t('当前阶段进度')} max={task.total} value={task.completed}></progress>{/if}</div>{/each}
+   </div><Button.Root class="outline" onclick={()=>onIndexDetails?.()}>{$t('查看索引详情')}</Button.Root>
+  </div>{/if}
+  <div class="simple-file-list">
+   {#if scope}<Button.Root class="simple-file-row library-parent" aria-label={$t('返回上层')} onclick={()=>onbrowse(parent)}>{@html icon('back')}<span>{$t('返回上层')}</span></Button.Root>{/if}
+   {#each visibleEntries as entry}{@const fileState=entry.directory?undefined:fileIndexState(conversionByPath.get(entry.path)??indexedByPath.get(entry.path))}{@const unindexed=!!scope&&!entry.directory&&!indexedPaths.has(entry.path)}<div class="simple-file-entry" class:unindexed role="presentation" oncontextmenu={(e:MouseEvent)=>{e.preventDefault();onmenu(e,entry.path,!scope,!entry.directory)}}><Button.Root class="simple-file-row" title={unindexed?undefined:displayPath(entry.path)} onclick={()=>{if(unindexed){promptPath=entry.path;conversionPrompt=true}else onbrowse(entry.path)}}>{@html icon(entry.directory?'folder':'file')}<span>{entry.name}</span>{#if fileState}<span class="file-index-state" data-state={indexedByPath.get(entry.path)?.index_status} title={$t(fileState.description)+((conversionByPath.get(entry.path)??indexedByPath.get(entry.path))?.index_error?`\n${(conversionByPath.get(entry.path)??indexedByPath.get(entry.path))?.index_error}`:'')}>{$t(fileState.label)}</span>{/if}{#if !entry.directory&&noteByPath.get(entry.path)}{@const note=noteByPath.get(entry.path)!}<span class="note-badge" data-state={note.state} title={$t(note.state==='intact'?'笔记引用一致':note.state==='moved'?'笔记引用位置已更新':note.state==='changed'?'笔记引用的原文已改':note.state==='missing'?'笔记引用的来源缺失':'笔记未核对')}></span>{:else if entry.directory}{@const count=folderAttention(entry.path)}{#if count}<span class="note-badge-count" title={$t('{value0} 篇笔记需要关注',{value0:count})}>{count}</span>{/if}{/if}{#if entry.directory}{@html icon('chevron')}{/if}</Button.Root></div>{/each}
+  </div>
+  {#if reading}<div class="empty" role="status">{$t('正在读取文件夹…')}</div>{:else if !entries.length}<div class="empty">{scope?$t('文件夹是空的'):$t(webFolder?'先创建文件夹，再上传文件或文件夹。':'添加文件夹并完成索引后，文件会显示在这里。')}</div>{:else if !visibleEntries.length}<div class="empty">{$t('没有符合条件的文件')}</div>{/if}
+ </div>{/if}
+</div>
+
+{#if conversionPrompt}<Modal label={$t(promptProcessing?'文件正在处理中':promptNeedsOcr?'扫描件需要图片识别组件':'需要转换文档后才能检索')} onClose={()=>conversionPrompt=false}>
+ <div class="dialog-head"><h2>{$t(promptProcessing?'文件正在处理中':promptNeedsOcr?'扫描件需要图片识别组件':'需要转换文档后才能检索')}</h2></div>
+ <div class="dialog-body">{#if promptProcessing}<p>{$t('当前状态：{value0}',{value0:$t(scopeState)})}</p><p>{$t('后台处理完成后即可打开和检索，请在索引详情中查看进度。')}</p>{:else if promptNeedsOcr}<p>{$t('这个文件没有文字层，需要安装图片识别（OCR）组件后才能转换。')}</p>{:else if promptIssue}<p>{$t('索引时出错：{value0}',{value0:$t(promptIssue)})}</p>{:else}<p>{$t('请前往文件设置，配置文件格式和文档转换。')}</p>{/if}</div>
+ <div class="dialog-footer"><Button.Root type="button" onclick={()=>conversionPrompt=false}>{$t('取消')}</Button.Root><Button.Root type="button" class="primary" onclick={()=>{conversionPrompt=false;if(promptProcessing)onIndexDetails?.();else onSettings?.()}}>{$t(promptProcessing?'查看索引详情':'去设置')}</Button.Root></div>
+</Modal>{/if}
+
+<style>
+ .web-library-actions{flex-wrap:wrap;justify-content:flex-end;gap:8px 20px}
+ @media(max-width:680px){.web-library-title{flex-wrap:wrap}.web-library-actions{flex-basis:100%;justify-content:flex-start;margin-left:0}}
+ .file-index-state{flex:0 1 auto;font-size:11px;padding:2px 7px;border-radius:5px;background:var(--color-panel);color:var(--color-muted)}
+ .file-index-state[data-state="enhancement_failed"]{color:var(--color-ink);border:1px solid var(--color-rule)}
+ .folder-index-status{display:flex;align-items:center;gap:20px;border:1px solid var(--color-rule);background:var(--color-panel);border-radius:10px;padding:14px 16px;margin:0 0 20px;font-size:12px}
+ .folder-index-status>div{flex:1;min-width:0}.folder-index-status strong{font-weight:500}.folder-index-count{margin-left:12px;color:var(--color-muted);font-variant-numeric:tabular-nums}
+ .folder-extra-task{margin-top:12px;padding-top:6px;border-top:1px solid var(--color-rule)}
+ .folder-index-status p{margin:6px 0 0;color:var(--color-muted);line-height:1.6;overflow-wrap:anywhere}
+ .folder-index-status progress{display:block;width:100%;height:4px;margin-top:10px;accent-color:var(--color-ink)}
+ .folder-index-status :global(button){flex-shrink:0}
+</style>

@@ -1,0 +1,12 @@
+# No repository synchronization or publishing is configured here.
+workflow:
+  rules:
+    - when: never
+
+stages:
+  - check
+
+repository_configuration:
+  stage: check
+  script:
+    - echo "No GitLab synchronization is configured."

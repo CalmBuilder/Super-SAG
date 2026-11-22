@@ -1,0 +1,61 @@
+# Documentation screenshots
+
+The screenshot fixture mounts the current application and its real components.
+All service responses are synthetic and in memory: no user files, credentials,
+models, update services or MCP servers are accessed. Search timings, index runs
+and graph edges illustrate UI states; they are not performance or backend test
+results. Browser-extension screenshots are maintained separately.
+
+The current refresh targets the 0.2.3 UI: a folder-only sidebar and conversation
+history on the Q&A home. These screenshots follow this branch, not necessarily
+the latest released installer. The About screen reads the package version.
+
+From the repository root, install the locked application dependencies and make
+Playwright available after `npm ci` (or set `PLAYWRIGHT_MODULE` to an existing
+Playwright module). Google Chrome is
+required by the capture scripts.
+
+```sh
+npm ci
+npm install --no-save --package-lock=false playwright
+npx vite build -c bench/docs.config.ts
+npx vite preview -c bench/docs.config.ts
+# In another terminal:
+node bench/capture-docs.cjs
+```
+
+The preview binds to loopback port 1437. Captures use a 1280 × 900 light window
+and localized, fictitious project documents. Scripts wait for rendered Markdown,
+citations and dialogs, and fail on browser page errors. The four README scenes
+are copied from the corresponding documentation screenshots. Review both
+languages visually after capture; rendering checks are not an app acceptance
+test. The `many` and `diagram` fixture options demonstrate scrolling and Mermaid.
+
+Refresh the matching bilingual MDX instructions whenever navigation or controls
+change. Preserve extension screenshots, branding, community QR codes and
+benchmark charts unless their owning features change.
+
+`node bench/docs/large-reader.cjs` captures the bilingual read-first large
+Markdown view with its paged outline and full-document find controls. The
+`large-reader` fixture is a generated project handbook, never a private book.
+The script also checks that no editor is mounted and at most 12 content pieces
+are attached. These synthetic screenshots are separate from real-file/native
+performance acceptance.
+
+`node bench/docs/fold.cjs` refreshes folding and processing-progress screenshots. It also
+checks the embedded original TextFold renderer under the desktop CSP: moving
+text, fractional slider positions, chapter cards, preserved tables, local
+paragraph expansion, return to editing, dark mode, percentage progress, and cancellation. Set `DOCS_PORT` when using
+a separate fixture server (default 1437).
+
+`node bench/docs/offline-component.cjs` captures the bilingual offline document
+component import entry after a simulated download failure. It checks the real
+dialog at 1280 and 720 pixels; it does not install a component or run OCR.
+
+`node bench/docs/progressive-index.cjs` captures the bilingual basic-text and
+background-enhancement labels in the real file-list component. These synthetic
+states demonstrate availability and failure retention, not measured parser results.
+
+`node bench/docs/office-text.cjs` captures the default-off DOCX/PPTX text-only
+setting in both languages. The fixture checks the actual switch state; it does
+not parse Office files or measure memory.

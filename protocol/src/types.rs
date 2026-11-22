@@ -1,0 +1,796 @@
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum ReasoningEffort {
+    None,
+    Low,
+    Medium,
+    High,
+    Max,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ModelProfile {
+    pub system_prompt: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning_effort: Option<ReasoningEffort>,
+    pub sag2_enabled: bool,
+    pub mcp_servers: Vec<String>,
+    pub mcp_tools: BTreeMap<String, Vec<String>>,
+}
+impl Default for ModelProfile {
+    fn default() -> Self {
+        Self {
+            system_prompt: String::new(),
+            reasoning_effort: None,
+            sag2_enabled: true,
+            mcp_servers: vec![],
+            mcp_tools: BTreeMap::new(),
+        }
+    }
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(default)]
+pub struct McpServer {
+    pub id: String,
+    pub name: String,
+    pub transport: String,
+    pub url: String,
+    pub command: String,
+    pub args: Vec<String>,
+    pub require_confirmation: bool,
+    pub has_credentials: bool,
+    pub tools: Option<Vec<McpToolInfo>>,
+}
+impl Default for McpServer {
+    fn default() -> Self {
+        Self {
+            id: String::new(),
+            name: String::new(),
+            transport: "http".into(),
+            url: String::new(),
+            command: String::new(),
+            args: vec![],
+            require_confirmation: true,
+            has_credentials: false,
+            tools: None,
+        }
+    }
+}
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct McpCredentials {
+    pub env: BTreeMap<String, String>,
+    pub headers: BTreeMap<String, String>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct McpToolInfo {
+    pub name: String,
+    pub description: String,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ToolApproval {
+    pub id: String,
+    pub query_id: String,
+    pub server_name: String,
+    pub tool_name: String,
+    pub arguments: serde_json::Value,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Root {
+    pub path: String,
+    pub name: String,
+    pub status: String,
+    pub count: usize,
+    pub error: Option<String>,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub struct IndexProgress {
+    pub count: usize,
+    pub total: usize,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Entry {
+    pub path: String,
+    pub name: String,
+    pub directory: bool,
+    pub symlink: bool,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Document {
+    pub id: i64,
+    pub path: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_path: Option<String>,
+    pub name: String,
+    pub body: String,
+    pub hash: String,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct FileInfo {
+    pub id: i64,
+    pub path: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_path: Option<String>,
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub index_status: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub index_error: Option<String>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct DocumentTerm {
+    pub term: String,
+    pub count: usize,
+    pub boost: f64,
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SourceSpan {
+    pub start_byte: usize,
+    pub end_byte: usize,
+    pub start_line: usize,
+    pub start_column: usize,
+    pub end_line: usize,
+    pub end_column: usize,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Candidate {
+    pub id: i64,
+    pub document_id: i64,
+    pub path: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_path: Option<String>,
+    pub title: String,
+    pub heading: String,
+    pub content: String,
+    pub start_line: usize,
+    pub end_line: usize,
+    pub source_ranges: Vec<(usize, usize)>,
+    #[serde(default)]
+    pub source_spans: Vec<SourceSpan>,
+    pub bm25: f64,
+    pub score: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub previous_score: Option<f64>,
+    pub order: usize,
+    pub hash: String,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SearchPagination {
+    pub total: usize,
+    pub page: usize,
+    pub page_size: usize,
+}
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ModelAuthMode {
+    #[default]
+    Bearer,
+    None,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ModelConfig {
+    pub url: String,
+    pub model: String,
+    pub models: Vec<String>,
+    pub has_key: bool,
+    pub auth_mode: ModelAuthMode,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning_effort: Option<ReasoningEffort>,
+}
+impl Default for ModelConfig {
+    fn default() -> Self {
+        Self {
+            url: "https://api.302ai.cn/v1".into(),
+            model: "qwen3.8-flash".into(),
+            models: vec!["qwen3.8-flash".into()],
+            has_key: false,
+            auth_mode: ModelAuthMode::Bearer,
+            reasoning_effort: None,
+        }
+    }
+}
+impl ModelConfig {
+    pub fn is_configured(&self) -> bool {
+        !self.model.trim().is_empty() && (self.auth_mode == ModelAuthMode::None || self.has_key)
+    }
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Retrieval {
+    pub candidate_k: usize,
+    pub seed_k: usize,
+    pub expansion_term_limit: usize,
+    pub max_hops: usize,
+    pub top_k: usize,
+    pub chunk_chars: usize,
+}
+impl Default for Retrieval {
+    fn default() -> Self {
+        Self {
+            candidate_k: 50,
+            seed_k: 10,
+            expansion_term_limit: 20,
+            max_hops: 1,
+            top_k: 10,
+            chunk_chars: 512,
+        }
+    }
+}
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct FileTypes {
+    pub markdown: bool,
+    pub text: bool,
+    pub code: bool,
+    pub config: bool,
+}
+impl Default for FileTypes {
+    fn default() -> Self {
+        Self {
+            markdown: true,
+            text: true,
+            code: false,
+            config: false,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FolderIndexOptions {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extensions: Option<Vec<String>>,
+    pub file_types: FileTypes,
+    pub convert_other_formats: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub conversion_formats: Option<Vec<String>>,
+}
+pub const OFFICIAL_UPDATE_GITHUB: &str = "https://github.com/CalmBuilder/Super-SAG";
+pub const OFFICIAL_UPDATE_MANIFEST: &str = "https://github.com/CalmBuilder/Super-SAG/releases/latest/download/latest-v2.json";
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct UpdateSettings {
+    #[serde(default)]
+    pub source: UpdateSource,
+    #[serde(default = "official_update_github")]
+    pub github_url: String,
+    #[serde(default)]
+    pub website_url: String,
+    #[serde(default)]
+    pub follow_language: bool,
+}
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum UpdateSource {
+    #[default]
+    Github,
+    Website,
+}
+fn official_update_github() -> String {
+    OFFICIAL_UPDATE_GITHUB.into()
+}
+impl Default for UpdateSettings {
+    fn default() -> Self {
+        Self {
+            source: UpdateSource::Website,
+            github_url: official_update_github(),
+            website_url: OFFICIAL_UPDATE_MANIFEST.into(),
+            follow_language: true,
+        }
+    }
+}
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "mode", rename_all = "snake_case")]
+pub enum ConversionStorage {
+    #[default]
+    AppData,
+    Library,
+    Custom { directory: String },
+}
+
+fn legacy_conversion_storage() -> ConversionStorage { ConversionStorage::Library }
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DocumentParser {
+    Docling,
+    Mineru,
+    Vision,
+}
+
+/// How outbound requests reach the internet.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ProxyMode {
+    /// Follow the Windows or macOS proxy settings and the standard proxy environment variables.
+    #[default]
+    System,
+    /// Send every outbound request through `ModelProxy::url`.
+    Custom,
+    /// Connect directly, ignoring system proxies and environment variables.
+    None,
+}
+
+/// Proxy settings shared by the desktop, the CLI and the background service.
+#[derive(Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(from = "ModelProxyWire")]
+pub struct ModelProxy {
+    pub mode: ProxyMode,
+    /// `http://`, `https://`, `socks5://` or `socks5h://` address; a bare `host:port` means HTTP.
+    pub url: String,
+    /// Basic authentication user for the custom proxy; the password is stored with the model keys.
+    pub username: String,
+    /// Comma-separated hosts, domain suffixes, IPs and networks that connect directly.
+    pub bypass: String,
+    /// Whether a proxy password is stored locally; never carries the secret itself.
+    pub has_password: bool,
+    /// A password typed in settings. The service stores it with the model keys and clears it
+    /// before the settings are persisted or returned, so it only travels inbound.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub password: Option<String>,
+    /// The stored password, attached in memory by the service; never serialized.
+    #[serde(skip)]
+    pub stored_password: Option<String>,
+}
+impl ModelProxy {
+    /// Attaches the password read from local storage and the flag the UI shows for it.
+    pub fn with_stored_password(mut self, password: Option<String>) -> Self {
+        self.has_password = password.is_some();
+        self.stored_password = password;
+        self
+    }
+}
+impl std::fmt::Debug for ModelProxy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ModelProxy")
+            .field("mode", &self.mode)
+            .field("url", &self.url)
+            .field("username", &self.username)
+            .field("bypass", &self.bypass)
+            .field("has_password", &self.has_password)
+            .field("password", &self.password.as_ref().map(|_| "<redacted>"))
+            .field("stored_password", &self.stored_password.as_ref().map(|_| "<redacted>"))
+            .finish()
+    }
+}
+/// Settings saved by 0.4.0 carry only `url` and `bypass`; a non-empty address meant a custom proxy.
+#[derive(Default, Deserialize)]
+#[serde(default)]
+struct ModelProxyWire {
+    mode: Option<ProxyMode>,
+    url: String,
+    username: String,
+    bypass: String,
+    has_password: bool,
+    password: Option<String>,
+}
+impl From<ModelProxyWire> for ModelProxy {
+    fn from(wire: ModelProxyWire) -> Self {
+        let mode = wire.mode.unwrap_or(if wire.url.trim().is_empty() { ProxyMode::System } else { ProxyMode::Custom });
+        Self {
+            mode,
+            url: wire.url,
+            username: wire.username,
+            bypass: wire.bypass,
+            has_password: wire.has_password,
+            password: wire.password,
+            stored_password: None,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Settings {
+    pub runtime: crate::runtime::RuntimeSettings,
+    pub model_proxy: ModelProxy,
+    pub mineru: crate::mineru::MineruConfig,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub document_parser: Option<DocumentParser>,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub document_parser_model: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub document_parser_pdf_prompt: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub document_parser_image_prompt: String,
+    pub updates: UpdateSettings,
+    pub convert_other_formats: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub conversion_formats: Option<Vec<String>>,
+    #[serde(default = "legacy_conversion_storage")]
+    pub conversion_storage: ConversionStorage,
+    #[serde(default)]
+    pub retrieval_version: u8,
+    pub credential_error: Option<String>,
+    pub answer: ModelConfig,
+    pub jev: ModelConfig,
+    pub retrieval: Retrieval,
+    pub theme: String,
+    pub language: String,
+    pub start_page: String,
+    pub editor_size: usize,
+    pub show_hidden: bool,
+    pub show_index_details: bool,
+    pub watch: bool,
+    pub index_workers: usize,
+    pub conversion_workers: usize,
+    pub excluded: Vec<String>,
+    pub file_types: FileTypes,
+    pub timeout_secs: u64,
+    pub answer_context_tokens: usize,
+    pub answer_output_tokens: usize,
+    /// Maximum tool calls per turn; 0 leaves the number unlimited.
+    /// The default bounds a model that keeps retrying the same lookups.
+    pub max_tool_calls: usize,
+    pub search_summary_enabled: bool,
+    pub search_summary_model: String,
+    pub search_summary_sources: usize,
+    pub model_profiles: BTreeMap<String, ModelProfile>,
+    pub mcp_servers: Vec<McpServer>,
+    #[serde(default)]
+    pub notes: NoteSettings,
+    pub chat_import_folder: Option<String>,
+}
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            runtime: crate::runtime::RuntimeSettings::default(),
+            model_proxy: ModelProxy::default(),
+            mineru: crate::mineru::MineruConfig::default(),
+            document_parser: None,
+            document_parser_model: String::new(),
+            document_parser_pdf_prompt: String::new(),
+            document_parser_image_prompt: String::new(),
+            updates: UpdateSettings::default(),
+            convert_other_formats: false,
+            conversion_formats: None,
+            conversion_storage: ConversionStorage::default(),
+            retrieval_version: crate::RETRIEVAL_VERSION,
+            credential_error: None,
+            answer: ModelConfig::default(),
+            jev: ModelConfig {
+                url: "https://api.302ai.cn/typesafeai/v1".into(),
+                model: "jev-latest".into(),
+                models: vec![],
+                has_key: false,
+                auth_mode: ModelAuthMode::Bearer,
+                reasoning_effort: None,
+            },
+            retrieval: Retrieval::default(),
+            theme: "light".into(),
+            language: crate::locales::default_interface_language().into(),
+            start_page: "ask".into(),
+            editor_size: 15,
+            show_hidden: false,
+            show_index_details: false,
+            watch: true,
+            index_workers: 8,
+            conversion_workers: 4,
+            file_types: FileTypes::default(),
+            excluded: [
+                ".git",
+                "node_modules",
+                "dist",
+                "target",
+                ".venv",
+                "venv",
+                "__pycache__",
+            ]
+            .into_iter()
+            .map(String::from)
+            .collect(),
+            timeout_secs: 120,
+            answer_context_tokens: 65536,
+            answer_output_tokens: 2048,
+            max_tool_calls: 20,
+            search_summary_enabled: true,
+            search_summary_model: String::new(),
+            search_summary_sources: 10,
+            model_profiles: BTreeMap::new(),
+            mcp_servers: vec![],
+            notes: NoteSettings::default(),
+            chat_import_folder: None,
+        }
+    }
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ContextSummary {
+    pub text: String,
+    pub covered_turns: usize,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AnswerContext {
+    pub limit: usize,
+    pub reserved_output: usize,
+    pub estimated_input: usize,
+    pub omitted_sources: usize,
+    pub omitted_history: usize,
+    pub input_tokens: Option<usize>,
+    pub output_tokens: Option<usize>,
+    #[serde(default)]
+    pub elapsed_ms: Option<u64>,
+    #[serde(default)]
+    pub generation_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub summary: Option<ContextSummary>,
+    /// Why the model summary failed this turn; older history was dropped locally instead.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub summary_error: Option<String>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ToolCallRecord {
+    pub id: String,
+    /// UTF-16 position in the answer where this tool was called.
+    #[serde(default)]
+    pub answer_offset: Option<usize>,
+    pub query: String,
+    pub source_count: usize,
+    #[serde(default)]
+    pub elapsed_ms: Option<u64>,
+    #[serde(default)]
+    pub tool_name: Option<String>,
+    #[serde(default)]
+    pub server_name: Option<String>,
+    #[serde(default)]
+    pub is_error: bool,
+    #[serde(default)]
+    pub denied: bool,
+    /// Identical to an earlier call in the same turn; not executed again.
+    #[serde(default)]
+    pub skipped: bool,
+    #[serde(default)]
+    pub result: Option<serde_json::Value>,
+    #[serde(default)]
+    pub error: Option<String>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ReasoningBlock {
+    /// UTF-16 position in the answer, after the preceding tool calls.
+    pub answer_offset: usize,
+    pub tool_count: usize,
+    pub content: String,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Message {
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub help: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub created_at: Option<i64>,
+    pub question: String,
+    pub answer: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub reasoning: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub reasoning_blocks: Vec<ReasoningBlock>,
+    pub evidence: Vec<Candidate>,
+    pub model: String,
+    pub scope: Vec<String>,
+    pub references: Vec<String>,
+    pub status: String,
+    pub error: Option<String>,
+    pub retrieval_question: String,
+    #[serde(default)]
+    pub tool_calls: Vec<ToolCallRecord>,
+    #[serde(default)]
+    pub context: Option<AnswerContext>,
+    /// Absolute path of the note this answer was saved to, if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note_path: Option<String>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Conversation {
+    pub id: String,
+    pub title: String,
+    pub messages: Vec<Message>,
+    pub updated: i64,
+    pub deleted: bool,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Draft {
+    pub path: String,
+    pub name: String,
+    pub body: String,
+    pub hash: String,
+    pub is_new: bool,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ToolProgress {
+    pub call: ToolCallRecord,
+    pub finished: bool,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Progress {
+    pub replace: bool,
+    pub id: String,
+    pub stage: String,
+    pub delta: Option<String>,
+    pub reasoning_delta: Option<String>,
+    pub reasoning_block: Option<ReasoningBlock>,
+    pub count: usize,
+    pub tool: Option<ToolProgress>,
+}
+
+#[cfg(test)]
+mod default_tests {
+    use super::*;
+    #[test]
+    fn decision_model_defaults_to_302_and_preserves_explicit_settings() {
+        for settings in [Settings::default(), serde_json::from_str::<Settings>("{}").unwrap()] {
+            assert_eq!(settings.jev.url, "https://api.302ai.cn/typesafeai/v1");
+            assert_eq!(settings.jev.model, "jev-latest");
+            assert_eq!(settings.jev.auth_mode, ModelAuthMode::Bearer);
+            assert!(!settings.jev.has_key);
+        }
+        let saved: Settings = serde_json::from_str(
+            r#"{"jev":{"url":"http://127.0.0.1:8000/v1","model":"custom-decision","auth_mode":"none"}}"#,
+        ).unwrap();
+        assert_eq!(saved.jev.url, "http://127.0.0.1:8000/v1");
+        assert_eq!(saved.jev.model, "custom-decision");
+        assert_eq!(saved.jev.auth_mode, ModelAuthMode::None);
+    }
+    #[test]
+    fn message_timestamps_preserve_existing_history_without_inventing_dates() {
+        let old = serde_json::json!({
+            "question":"old question","answer":"old answer","evidence":[],
+            "model":"test","scope":[],"references":[],"status":"complete",
+            "error":null,"retrieval_question":"old question"
+        });
+        let mut message: Message = serde_json::from_value(old).unwrap();
+        assert!(message.created_at.is_none());
+        assert!(serde_json::to_value(&message).unwrap().get("created_at").is_none());
+        message.created_at = Some(1_792_368_300_000);
+        let restored: Message = serde_json::from_value(serde_json::to_value(message).unwrap()).unwrap();
+        assert_eq!(restored.created_at, Some(1_792_368_300_000));
+    }
+    #[test]
+    fn sag2_stays_enabled_for_new_and_existing_model_profiles() {
+        assert!(ModelProfile::default().sag2_enabled);
+        assert!(
+            serde_json::from_str::<ModelProfile>(
+                r#"{"system_prompt":"原有提示词","mcp_servers":["wiki"]}"#
+            )
+            .unwrap()
+            .sag2_enabled
+        );
+        assert!(
+            !serde_json::from_str::<ModelProfile>(r#"{"sag2_enabled":false}"#)
+                .unwrap()
+                .sag2_enabled
+        );
+    }
+    #[test]
+    fn answer_context_defaults_to_64k() {
+        assert_eq!(Settings::default().answer_context_tokens, 65_536);
+        assert_eq!(
+            serde_json::from_str::<Settings>("{}")
+                .unwrap()
+                .answer_context_tokens,
+            65_536
+        );
+    }
+    #[test]
+    fn index_details_are_hidden_for_new_and_existing_settings() {
+        assert!(!Settings::default().show_index_details);
+        assert!(!serde_json::from_str::<Settings>("{}").unwrap().show_index_details);
+        assert!(serde_json::from_str::<Settings>(r#"{"show_index_details":true}"#).unwrap().show_index_details);
+    }
+    #[test]
+    fn tool_call_limit_defaults_to_twenty_and_keeps_explicit_values() {
+        assert_eq!(Settings::default().max_tool_calls, 20);
+        assert_eq!(serde_json::from_str::<Settings>("{}").unwrap().max_tool_calls, 20);
+        assert_eq!(serde_json::from_str::<Settings>(r#"{"max_tool_calls":10}"#).unwrap().max_tool_calls, 10);
+        assert_eq!(serde_json::from_str::<Settings>(r#"{"max_tool_calls":0}"#).unwrap().max_tool_calls, 0);
+    }
+
+    #[test]
+    fn retrieval_defaults_to_v10() {
+        let expected = serde_json::json!({"candidate_k":50,"seed_k":10,"expansion_term_limit":20,"max_hops":1,"top_k":10,"chunk_chars":512});
+        assert_eq!(
+            serde_json::to_value(Settings::default().retrieval).unwrap(),
+            expected
+        );
+        assert_eq!(
+            serde_json::to_value(serde_json::from_str::<Settings>("{}").unwrap().retrieval)
+                .unwrap(),
+            expected
+        );
+    }
+}
+
+/// Notes: answers saved as Markdown with verifiable source anchors.
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct NoteSettings {
+    /// Folder that receives saved notes; `None` uses the default library folder.
+    pub folder: Option<String>,
+    /// Ask for a location on every save instead of reusing the remembered folder.
+    pub ask_location: bool,
+}
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NoteSourceState {
+    Intact,
+    Moved,
+    Changed,
+    Missing,
+    #[default]
+    Unverified,
+}
+impl NoteSourceState {
+    /// Attention order: missing > changed > unverified > moved > intact.
+    pub fn severity(self) -> u8 {
+        match self {
+            Self::Missing => 4,
+            Self::Changed => 3,
+            Self::Unverified => 2,
+            Self::Moved => 1,
+            Self::Intact => 0,
+        }
+    }
+    pub fn needs_attention(self) -> bool {
+        self.severity() >= 2
+    }
+}
+/// One citation anchor stored in a note's frontmatter.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct NoteSource {
+    pub id: usize,
+    /// Absolute path after resolution.
+    pub path: String,
+    /// Original document for converted files, shown instead of the Markdown output.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display_path: Option<String>,
+    pub hash: String,
+    pub start_byte: usize,
+    pub end_byte: usize,
+    pub start_line: usize,
+    pub end_line: usize,
+    pub text: String,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct NoteSourceStatus {
+    pub source: NoteSource,
+    pub state: NoteSourceState,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub current: Option<SourceSpan>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub current_hash: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub current_text: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub similarity: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub checked_at: Option<i64>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct NoteSummary {
+    pub path: String,
+    pub title: String,
+    pub question: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub asked_at: Option<i64>,
+    #[serde(default)]
+    pub model: String,
+    #[serde(default)]
+    pub scope: Vec<String>,
+    pub state: NoteSourceState,
+    pub source_count: usize,
+    /// Sources whose state needs attention.
+    pub attention: usize,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub checked_at: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parse_error: Option<String>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct NoteDetail {
+    pub summary: NoteSummary,
+    pub sources: Vec<NoteSourceStatus>,
+}

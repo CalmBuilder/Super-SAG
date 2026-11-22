@@ -1,0 +1,95 @@
+---
+title: "MCP 说明"
+description: "通过 Streamable HTTP 连接 Super-SAG，搜索原文并浏览文件夹。"
+---
+
+| 客户端设置 | 填写内容 |
+| --- | --- |
+| 传输方式 | **Streamable HTTP** |
+| 本机地址 | `http://127.0.0.1:24681/mcp`（默认） |
+| 局域网地址 | `http://192.168.1.10:24681/mcp`（示例） |
+| 鉴权 | `Authorization: Bearer <API_KEY>`，替换为完整的 API Key |
+
+## 连接 MCP 客户端
+
+1. 在运行 Super-SAG 的电脑上添加要搜索的文件夹。打开 **设置 → 远程服务**，创建一个 API Key，然后开启 API。也可以用独立 CLI 启动，见 [开启服务](/zh/docs/api-guide#开启服务)。
+2. 同一台电脑选择 **本机 MCP**，局域网内的其他电脑选择 **局域网 MCP**。点击对应地址右侧的复制图标；有多个可复制 Key 时，先选择此项目的 Key，再将完整配置导入客户端。只有一个可复制 Key 时直接使用该 Key。
+3. 保存后，在客户端确认能看到 `search` 和 `folders`。可以先问：“用 Super-SAG 列出已接入的文件夹，再在项目资料里快速搜索‘部署流程’，并给出原文位置。”
+
+### 用 CLI 导出配置
+
+在运行 Super-SAG 的电脑上执行 `super-sag api status`，查看本机和可用的局域网 MCP 地址。普通状态和 `--json` 都只显示 Key 数量。
+
+```sh
+super-sag api mcp config
+super-sag api mcp config --address http://192.168.1.10:24681/mcp --key-id KEY_ID
+```
+
+第一条命令使用本机地址和最近创建的可复制 Key。第二条命令中的地址请替换为状态中列出的地址，Key ID 可用 `super-sag api key list` 查看。将输出的 JSON 导入客户端。配置包含完整 Key，请妥善保管。后台未运行时，先执行 `super-sag api start`。
+
+如果客户端支持导入 `mcpServers` JSON，可以使用以下格式。已有其他服务时，把 `super-sag` 加到现有的 `mcpServers` 中。
+
+```json
+{
+  "mcpServers": {
+    "super-sag": {
+      "type": "http",
+      "url": "http://127.0.0.1:24681/mcp",
+      "headers": {
+        "Authorization": "Bearer <API_KEY>"
+      }
+    }
+  }
+}
+```
+
+## 可用工具
+
+### `search`：搜索原文
+
+| 参数 | 说明 |
+| --- | --- |
+| `query` | 必填。关键词或完整问题，1–2000 个字符。 |
+| `mode` | `fast` 快速搜索关键词，无需模型；`deep` 按完整问题查找相关证据，需要在 Super-SAG 配置决策模型。默认 `deep`。 |
+| `paths` | 可选。一个或多个服务端目录的完整路径。省略或传 `[]` 时搜索当前 Key 允许的全部文件夹；全库 Key 的行为保持不变。 |
+| `limit` | 可选。最多返回的原文片段数，1–100，默认 10。 |
+
+参数示例：快速搜索项目资料中的“部署流程”。
+
+```json
+{
+  "query": "部署流程",
+  "mode": "fast",
+  "paths": ["/data/项目资料"],
+  "limit": 5
+}
+```
+
+`results` 中每条结果包含文件路径 `path`、标题 `heading`、起止行号 `start_line` 和 `end_line`，以及原文片段 `content`。没有匹配时返回空数组。
+
+### `folders`：浏览文件夹
+
+传入 `{}` 列出当前 Key 的授权入口文件夹。全库 Key 继续列出全部根目录；仅授权某个子目录时，该子目录直接作为入口。传入 `path` 列出该目录的直接子文件夹，例如：
+
+```json
+{"path": "/data/项目资料"}
+```
+
+返回的 `folders` 列表包含每个文件夹的名称 `name` 和完整路径 `path`。可以把返回的路径填入 `search` 的 `paths` 来缩小搜索范围。两个工具都只读取知识库，不能添加目录或修改文件。
+
+## 常见问题
+
+| 现象 | 检查方法 |
+| --- | --- |
+| 无法连接或看不到工具 | 确认 API 正在运行、客户端支持 Streamable HTTP，并检查地址末尾是否为 `/mcp`。跨电脑连接时检查局域网地址和端口。 |
+| 返回 `401` | 检查是否填入完整 Key，是否保留 `Bearer ` 前缀，以及 Key 是否已撤销。 |
+| 提示未配置决策模型 | 在 Super-SAG 的模型设置中配置决策模型，或指定 `mode: "fast"`。 |
+| 路径不允许或没有结果 | 先用 `folders` 确认服务端目录，再检查文件是否已经索引。 |
+
+## 不同项目使用不同文件夹
+
+为每个项目创建独立 Key，并在 [API 设置](/zh/docs/api-guide#按项目限制文件夹) 中选择可访问的目录。项目 A 和 B 可以使用同一个 `/mcp` 地址，分别配置各自的 Key；不传搜索路径也只访问各自范围。公共目录可同时授权给两个项目。请将对应配置保存到客户端的项目配置中；两个项目共用同一个 Key 时访问范围也相同。
+
+通过 CLI 导出时，请明确指定 `super-sag api mcp config --key-id KEY_ID`。不带 `--key-id` 的旧命令继续使用最近创建的可复制 Key，以保持脚本兼容。
+
+升级前已有 Key 和 MCP 配置继续保持全库访问，无需修改地址、凭据或工具调用。只有主动编辑某个 Key 的范围，该 Key 才会开始受限。授权目录失效返回 `scope_unavailable`；请求范围外路径返回 `path_not_allowed`，不会搜索其他目录。

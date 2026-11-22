@@ -1,0 +1,136 @@
+---
+title: "Development"
+description: "Prepare a development environment and run the source."
+---
+
+## Environment
+
+Install Node.js, npm, Rust and the Tauri development dependencies for the target platform. Frontend dependencies are pinned in `package-lock.json`; Rust dependencies are pinned in each crate's `Cargo.lock`.
+
+The repository has five Rust build entry points: `protocol/`, `client/`, `core/`, `cli/` and `src-tauri/`. Implement shared logic in `core/` so desktop and CLI do not maintain separate copies.
+
+## Run the desktop app from source
+
+Run from the repository root:
+
+```sh
+npm ci
+npm run tauri dev
+```
+
+The Tauri development command builds the debug CLI first, then starts Vite and the desktop backend. Frontend changes use hot reload; Rust changes require recompiling the backend. Routine UI development does not require repeatedly generating installers.
+
+The desktop development server ignores `.cache/`, `docs-site/`, and `browser-extension/build/`, so documentation and extension builds do not reload the desktop window.
+
+To start only the frontend development server:
+
+```sh
+npm run dev
+```
+
+The frontend server does not provide Tauri's local file and retrieval interfaces. Use the Tauri development entry point to verify complete desktop workflows.
+
+## Build the CLI
+
+```sh
+npm run build:cli:dev
+npm run build:cli
+```
+
+The first command produces a debug CLI; the second produces a release CLI. Development artifacts go in `src-tauri/bin/development/`, and release artifacts go in `src-tauri/bin/`. macOS artifacts go through a signing step.
+
+Desktop and CLI packaging read the target platform's PDFium archive from `third-party/pdfium/`, verify its SHA-256, and bundle the runtime and license files. This step requires no PDFium download.
+
+To install the current build in the user's terminal, run explicitly:
+
+```sh
+./src-tauri/bin/sag install cli
+super-sag --version
+```
+
+The installer checks ownership, checksums and build channel, validates a staged file, then replaces the executable atomically. The development desktop does not automatically update the release CLI, and the development CLI refuses to overwrite a registered release installation. After Rust source changes, rerun `npm run build:cli:dev` so desktop and service have the same build identity, then restart the desktop.
+
+## Build the desktop app
+
+```sh
+npm run build
+npm run tauri build
+```
+
+On Windows:
+
+```sh
+npm run package:windows
+```
+
+Use the system dependencies and signing configuration for the target platform. Distributable artifacts and the native CLI come from the same source version. For npm distribution, see [npm publishing](https://github.com/CalmBuilder/Super-SAG/blob/main/docs/en/npm-publishing.md).
+
+## Code checks
+
+```sh
+npm run check
+npm test
+cargo test --manifest-path protocol/Cargo.toml
+cargo test --manifest-path client/Cargo.toml
+cargo test --manifest-path core/Cargo.toml
+cargo test --manifest-path cli/Cargo.toml
+cargo test --manifest-path src-tauri/Cargo.toml --lib
+```
+
+If desktop builds or checks require local CLI resources, run `npm run build:cli:dev` first. Use an isolated data directory for manual development checks to avoid affecting the everyday knowledge base:
+
+```sh
+SAG_DATA_DIR=/path/to/dev-data npm run tauri dev
+SAG_DATA_DIR=/path/to/dev-data ./src-tauri/bin/development/sag service status
+```
+
+Set the same `SAG_DATA_DIR` when desktop and CLI should share development data. The service starts on demand after it exits. On macOS, exiting the desktop client leaves the service running. On Windows, quitting from the tray or app menu stops it. Run `super-sag service stop` after testing when needed. Features that need a model service use credentials configured by the developer. Indexing and local matching do not require API keys.
+
+## Documentation and repository boundaries
+
+`docs/` contains the current architecture, development guides, interface documentation and clearly identified design plans. Update the relevant document when implementation changes, rather than adding conflicting historical descriptions.
+
+Keep development artifacts, temporary output, logs, screenshots and local data out of the documentation directory. Credentials and user knowledge bases must not enter release packages. Keep automated tests and required fixtures in their respective test directories.
+
+## Web Clipper extension
+
+Run `npm run build:clipper` for Chrome / Edge packages in `src-tauri/clipper/`. On macOS with full Xcode, run `npm run build:clipper:safari` for the local Safari test app in `browser-extension/build/`. Test builds use the separate `com.supersag.webclipper.development` identifier so they do not interfere with the installed release.
+
+To prepare the production Safari app, run `node browser-extension/build.mjs --safari --release`, then sign and notarize both the app and its DMG. macOS desktop builds use the notarized installer at `src-tauri/clipper/super-sag-web-clipper-safari.dmg`, or the path supplied through `SAG_CLIPPER_SAFARI_DMG`, and stop if verification fails. Desktop builds do not overwrite release installers with unsigned test packages.
+
+## Next release preparation
+
+See the [changelog](/en/docs/updates) for changes by version. Installers come from the latest published release. Before release, frontend, documentation and macOS/Windows builds must pass on the same commit. Verify installation/upgrades, existing-index preservation, progressive states and failed-file retry. The tag, desktop and CLI versions must agree.
+
+Before merging a product PR, append user-facing Chinese bullets and matching English bullets to `CHANGELOG.md` under an explicit version heading, such as `## 0.3.4`. Use one single-line `- ` bullet per change, with Chinese first and `### English` before the matching English bullets in the same order. Keep published entries under their actual release versions; do not use a pending-release placeholder heading. PR checks reject missing, unchanged or placeholder release notes for product changes; explicitly labeled `release:skip` internal PRs are exempt. Documentation, CI and release-tooling-only PRs need no product notes. `CHANGELOG.md` is the only editable source for version history. Run `npm --prefix docs-site run changelog:generate` to regenerate both localized changelogs; never edit their generated content directly. `npm --prefix docs-site run changelog:lint` checks every version in PR CI, including documentation-only PRs. PR checks, new-tag preparation and draft publication reject missing or inconsistent entries; a successful documentation build alone is insufficient. `docs-site` builds independently without parent directories or Git. Release builds from the full repository first run `node scripts/documentation-release.mjs build`, then build the site, including `docs-version.json` in the output. After deployment, check out the expected commit and run `npm --prefix docs-site run verify:deployment -- --url https://your-docs-host.example --expected-sha <full-commit-sha> --release v0.3.5` to verify the manifest and both localized page markers. This is a hook for the actual deployment process; no hosting platform or desktop release is created.
+
+Each functional change may end with related Issue and PR Markdown links, for example `Fix formula rendering. ([PR #142](https://example.com/pull/142))`. Both languages retain these links. Links must accompany a functional description; link-only entries, commit subjects, commit hashes and commit links are not allowed.
+
+Fetch remote version tags before writing notes and use the next version computed by automation as the heading. Resolve version conflicts before merging. Preparation uses the reviewed notes for that version and aligns application, CLI and lockfile versions in a detached release commit without rewriting changelog headings on main. Missing or invalid notes stop preparation before tagging. Updater notes contain only bilingual product changes, without commit subjects, commit references, generated boilerplate or signing-migration prose. GitHub Release descriptions also include the Windows x64, Apple Silicon and Intel installer download table. Historical prepared tags remain verifiable.
+
+## Automated builds and releases
+
+Desktop releases and automatic updates require the project’s own signing configuration, which is not yet configured. Push, signing, and publication require the project owner’s authorization for that release.
+
+
+Release efficiency: portable frontend assets are built once from the same source for Windows x64, Apple Silicon and Intel installers; local builds remain self-contained. Each Mac signing job starts after its own installer build, without occupying a Mac runner to poll or waiting for other platforms. Native builds stage only the App archive; the signing stage creates the final DMG. Older checkpoints containing a temporary DMG remain reusable. Desktop releases no longer build an extra Safari development installer; native Safari saving tests remain. Signed updater archives and DMGs retain content, identity, ticket and signature checks, while identical binaries run the complete Jev E2E once.
+
+Core tests are reused only when all native source, tests, dependencies, configuration and compiler settings match the previous successful stable release, and all three native jobs in that release are verified successful. Changed inputs, an unverifiable baseline or failed lookup run complete native unit and integration tests on all three platforms. Python, native Safari saving and final production installer checks still run. Performance-probe examples that are not installer inputs are excluded, and the same CLI process regression is not executed twice. Lightweight jobs record reused results on Ubuntu without requesting Mac runners; Python and native Safari saving checks run in the corresponding platform production build. No required check or approval is added.
+
+Every stable Release includes the Windows x64 EXE, Apple Silicon DMG and Intel DMG with their update assets. Existing assembly and publication checks prevent publication if a platform is missing. The Release body lists all three installer links directly; in-app update notes continue to contain only product changes.
+
+Trusted tag jobs export dependency-only Rust caches for later versions, with repository, source, latest job attempt, compatibility and digest checks. These archives exclude app/test executables and local Super-SAG libraries and expire after 14 days. Only local package version changes are ignored by the compatibility key. A cache miss compiles normally; every required test and installer check still runs. Branch CI uses a separate validation namespace to measure archive overhead without signing or publishing.
+
+Dependency archives use the runner's existing zstd with multithreaded compression and streaming tar I/O. Restore validates the complete staged content and decompressor result before atomically replacing dependency files. Cache failure remains a normal-compilation fallback.
+
+CLI and desktop production compilation run on independent workers for each platform and join verified inputs before packaging. Compile-only resource staging preserves the original embedded configuration; actual installers include the verified CLI and QPDF resources and retain all package/CLI checks. macOS does not wait for Windows. Producer attempts and cache roles remain isolated. Test-profile changes are measured with the manual paired A/B workflow while retaining named tests, ignored status, assertions and overflow checks; they do not change production release optimization.
+
+PR E2E and Desktop use the same outer test concurrency budget of two. The standalone concurrency scenario still launches 20 client processes; the production service startup deadline is unchanged.
+
+The manual Rust profile workflow accepts `comparison=cgu-only` and `platform=macos` for a focused debug=1, CGU16/64 comparison. Use three same-runner paired rounds and compare complete compilation plus test execution before adopting a setting.
+
+Desktop native tests retain the existing debug=1, nonincremental CGU16 baseline: the measured candidates have not established a material, stable net saving in compilation plus test execution. Production release optimization settings remain unchanged.
+
+For internal/build-only changes that need no separate release, add `release:skip` to the PR before merging. Required checks still run. Automatic preparation skips tags/publication only when every product commit in the main push belongs to a labeled merged PR; mixed feature pushes release normally, and lookup errors stop preparation. Merge/squash/rebase are supported. Later feature releases include accumulated changes. The label does not cancel prepared releases or affect explicit tag/manual releases.
+
+If GitHub has not yet indexed the merged PR, or a product push has no uniquely verifiable merged PR (for example a direct push), preparation stops without creating a tag. Retry after indexing; explicit manual releases remain available.

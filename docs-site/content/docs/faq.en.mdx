@@ -1,0 +1,55 @@
+---
+title: "Troubleshooting"
+description: "Checks for installation, configuration and search issues."
+---
+
+## Can I use it without an API key?
+
+Yes, for indexing, browsing and local quick search. Semantic retrieval needs Jev configuration; generating answers needs an answer model.
+
+## Are my original files copied or uploaded?
+
+Adding a directory does not move original files. Indexes and metadata are stored locally. Deep search and Q&A send the required question and passages to configured services. Check the relevant component documentation for optional conversion behavior.
+
+## Why is a file missing from search?
+
+Confirm the folder is registered and indexing is ready. Then check file-type settings, ignore rules and excluded subfolders. From the CLI:
+
+```sh
+super-sag list
+super-sag check
+```
+
+A directory with zero indexed files has no searchable content.
+
+## Why does indexing progress appear after an upgrade or restart?
+
+The background service checks files against existing indexes at startup. The file total describes what is being checked, not how many files were rebuilt. Unchanged indexes and compatible successful conversions are reused. In [indexing details](/en/docs/folders#reindex-and-history), use Checked, Reused, Updated and Failed to distinguish checking from actual updates. Older history without this summary retains its original processed counts.
+
+Changed content, settings that affect parsed text, or a required parsing or index migration can still update affected documents. Keep indexes and the conversion output folder to retain reusable data.
+
+## What if Linux reaches the file monitoring limit?
+
+When Linux runs out of inotify watches, affected folders may stop updating automatically. Indexed content remains searchable. Check the current limit with `sysctl fs.inotify.max_user_watches` and raise it as needed. For example, if the value is below 524288, run `sudo sysctl fs.inotify.max_user_watches=524288`. On systems using systemd, save `fs.inotify.max_user_watches = 524288` in `/etc/sysctl.d/90-sag-inotify.conf` to keep the setting after reboot.
+
+Then [restart the Super-SAG background service](/en/docs/cli) with `super-sag service restart`. It sets up monitoring again and checks files on startup, so no manual index rebuild is needed.
+
+## What if the database was created by a newer version?
+
+Keep the data directory and continue using the newer application that created it, or install a compatible newer version. Applications with the version guard reject a newer database schema before running migrations. Previously shipped older binaries do not gain this protection. Do not downgrade the application or delete indexes and conversion caches to resolve the message.
+
+## Why is the super-sag command missing?
+
+Initialize the bundled CLI in the desktop app, reopen the terminal, and run `super-sag --version`. A standalone npm package has not been published.
+
+## Can the CLI work after the desktop app closes?
+
+Yes. Both use the same independent local service. Normal operations connect to or start it when required. `super-sag service status` only checks status and does not start it.
+
+## My company network needs a proxy to reach model services. What should I do?
+
+Open **Settings → Network proxy**, choose **Custom proxy**, and enter your company proxy address. Enter a username and password if the proxy requires authentication. Select **Test connection** to verify the route, then select **Save settings**. Model requests, MinerU, MCP, component downloads, and app updates share this setting. See [Network proxy](/en/docs/preferences#network-proxy).
+
+## How do I report an issue?
+
+Include your OS, app or CLI version, reproduction steps, expected behavior and actual result in [GitHub Issues](https://github.com/CalmBuilder/Super-SAG/issues). Hide keys and sensitive file contents in screenshots.

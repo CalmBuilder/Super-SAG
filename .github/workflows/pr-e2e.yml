@@ -1,0 +1,261 @@
+name: PR E2E
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-e2e-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  test-plan:
+    name: Select PR tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      native: ${{ steps.plan.outputs.native }}
+      client: ${{ steps.plan.outputs.client }}
+      cli: ${{ steps.plan.outputs.cli }}
+      jev: ${{ steps.plan.outputs.jev }}
+      http: ${{ steps.plan.outputs.http }}
+      web: ${{ steps.plan.outputs.web }}
+      qpdf: ${{ steps.plan.outputs.qpdf }}
+      frontend: ${{ steps.plan.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24.13.0'
+      - name: Select suites from the merge candidate
+        id: plan
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          node --test scripts/pr-test-plan.node-test.mjs
+          node scripts/pr-test-plan.mjs
+      - name: Build the portable browser workspace once
+        if: steps.plan.outputs.web == 'true'
+        run: |
+          npm ci
+          node --input-type=module -e "import {buildWebAssets} from './scripts/build-web-assets.mjs'; buildWebAssets();"
+      - name: Upload the browser workspace for this merge candidate
+        if: steps.plan.outputs.web == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pr-web-${{ github.sha }}
+          path: dist-web/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 3
+          overwrite: true
+
+  e2e:
+    name: E2E ${{ matrix.platform }}
+    needs: test-plan
+    if: ${{ always() && !cancelled() }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos
+            runner: macos-15
+            target: aarch64-apple-darwin
+            binary: src-tauri/target/debug/sag
+          - platform: windows
+            runner: windows-2025
+            target: x86_64-pc-windows-msvc
+            binary: src-tauri/target/debug/sag.exe
+    runs-on: ${{ needs.test-plan.outputs.native == 'true' && matrix.runner || 'ubuntu-24.04' }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    env:
+      CARGO_INCREMENTAL: '0'
+      # Match Desktop's outer fixture budget. Individual concurrency scenarios
+      # still launch their full set of client processes.
+      RUST_TEST_THREADS: '2'
+      CARGO_TARGET_DIR: ${{ github.workspace }}/src-tauri/target
+      PYTHONUTF8: '1'
+    steps:
+      - name: Require a successful test plan
+        env:
+          PLAN_RESULT: ${{ needs.test-plan.result }}
+        run: test "$PLAN_RESULT" = success
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: needs.test-plan.outputs.native == 'true'
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        if: needs.test-plan.outputs.native == 'true'
+        with:
+          python-version: '3.13.9'
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        if: needs.test-plan.outputs.native == 'true'
+        with:
+          toolchain: '1.98.1'
+      # PR debug-profile compatibility cache is read-only and isolated from Desktop debug1.
+      - name: Restore trusted Rust E2E dependencies
+        if: needs.test-plan.outputs.native == 'true'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            src-tauri/target/debug/.fingerprint/*
+            src-tauri/target/debug/build/*
+            src-tauri/target/debug/deps/*.rlib
+            src-tauri/target/debug/deps/*.rmeta
+            src-tauri/target/debug/deps/*.d
+            src-tauri/target/debug/deps/*.a
+            src-tauri/target/debug/deps/*.lib
+            src-tauri/target/debug/deps/*.so
+            src-tauri/target/debug/deps/*.dylib
+            src-tauri/target/debug/deps/*.dll
+            !src-tauri/target/debug/.fingerprint/sag-*
+            !src-tauri/target/debug/build/sag-*
+            !src-tauri/target/debug/deps/libsag_*
+            !src-tauri/target/debug/deps/sag_*
+          key: rust-v2-${{ runner.os }}-${{ runner.arch }}-${{ matrix.target }}-1.98.1-debug-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml', '**/.cargo/config.toml') }}
+          restore-keys: |
+            rust-v2-${{ runner.os }}-${{ runner.arch }}-${{ matrix.target }}-1.98.1-debug-
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: needs.test-plan.outputs.native == 'true'
+        with:
+          node-version: '24'
+      - name: Verify relocatable QPDF runtime package
+        if: needs.test-plan.outputs.qpdf == 'true'
+        run: node --test scripts/qpdf-packaging.node-test.mjs
+      - name: Download the browser workspace for this merge candidate
+        if: needs.test-plan.outputs.web == 'true'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: pr-web-${{ github.sha }}
+          path: dist-web/
+      - name: Use the verified browser workspace in the E2E executable
+        if: needs.test-plan.outputs.web == 'true'
+        run: |
+          test -f "$GITHUB_WORKSPACE/dist-web/index.html"
+          echo "SAG_WEB_DIST=$GITHUB_WORKSPACE/dist-web" >> "$GITHUB_ENV"
+      # Only compile the CLI needed by E2E, without Tauri or installers.
+      - name: Prepare E2E executable
+        if: needs.test-plan.outputs.native == 'true'
+        run: cargo build --locked --manifest-path cli/Cargo.toml
+      - name: Verify service shutdown synchronization
+        if: needs.test-plan.outputs.client == 'true'
+        run: cargo test --locked --manifest-path client/Cargo.toml shutdown_tests
+      - name: Verify captured commands stay console-free
+        if: needs.test-plan.outputs.client == 'true'
+        run: cargo test --locked --manifest-path client/Cargo.toml captured_tests
+      - name: Test CLI integration
+        if: needs.test-plan.outputs.cli == 'true'
+        run: cargo test --locked --manifest-path cli/Cargo.toml
+      - name: Prepare Chromium for the web fixture
+        if: needs.test-plan.outputs.web == 'true'
+        run: |
+          npm install --prefix "$RUNNER_TEMP/sag-web-browser" --no-save --package-lock=false playwright@1.65.1
+          node "$RUNNER_TEMP/sag-web-browser/node_modules/playwright/cli.js" install chromium
+
+      - name: Run selected end-to-end fixtures
+        if: needs.test-plan.outputs.jev == 'true' || needs.test-plan.outputs.http == 'true' || needs.test-plan.outputs.web == 'true'
+        env:
+          TEST_JEV: ${{ needs.test-plan.outputs.jev }}
+          TEST_HTTP: ${{ needs.test-plan.outputs.http }}
+          TEST_WEB: ${{ needs.test-plan.outputs.web }}
+          PLAYWRIGHT_BROWSER_CHANNEL: chromium
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/sag-web-browser/node_modules/playwright
+        run: |
+          suites=()
+          if [[ "$TEST_JEV" == true ]]; then suites+=(jev); fi
+          if [[ "$TEST_HTTP" == true ]]; then suites+=(http); fi
+          if [[ "$TEST_WEB" == true ]]; then suites+=(web); fi
+          python scripts/run-pr-e2e.py --binary "${{ matrix.binary }}" "${suites[@]}"
+
+  qpdf-linux:
+    name: QPDF package Linux
+    needs: test-plan
+    if: needs.test-plan.outputs.qpdf == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Verify relocatable QPDF runtime package
+        run: node --test scripts/qpdf-packaging.node-test.mjs
+
+  frontend:
+    name: Test frontend
+    needs: test-plan
+    if: needs.test-plan.outputs.frontend == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24.13.0'
+          cache: npm
+      - run: npm ci
+      - run: npm test
+
+  release-tooling:
+    name: Test release tooling
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24.13.0'
+      - name: Lint generated bilingual changelogs
+        run: node scripts/documentation-release.mjs lint
+      - name: Test documentation generation and deployment verification
+        run: node --test scripts/documentation-release.node-test.mjs
+      - name: Check reviewed product release notes before merge
+        if: ${{ !contains(github.event.pull_request.labels.*.name, 'release:skip') }}
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: node scripts/automatic-release.mjs check-notes
+      - name: Select release infrastructure changes without running a release
+        id: changes
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          node --input-type=module <<'NODE'
+          import {appendFileSync} from 'node:fs';
+          import {execFileSync} from 'node:child_process';
+          const paths = execFileSync('git', ['diff', '--name-only', '-z', process.env.BASE_SHA, 'HEAD', '--'], {encoding: 'utf8'}).split('\0').filter(Boolean);
+          const relevant = paths.some(path => /^(?:\.github\/workflows\/|config\/|src-tauri\/src\/update-fixtures\/)/.test(path) ||
+            /^scripts\/(?:automatic-release|release|configure-release|migrate-release-environment|sign-macos-release|build-cli|package-updates|verify-update|rust-dependency-cache|parallel-cli|test-profile-ab|prepare-qpdf|prepare-pdfium)[^/]*\.mjs$/.test(path) ||
+            path === 'scripts/rust-dependency-archive.py' ||
+            /^(?:src-tauri\/build(?:-resource-config)?|protocol\/build)\.rs$/.test(path) ||
+            /^(?:package(?:-lock)?\.json|(?:cli|src-tauri)\/Cargo\.(?:toml|lock)|src-tauri\/tauri[^/]*\.json|docs-site\/lib\/release-downloads\.ts)$/.test(path));
+          appendFileSync(process.env.GITHUB_OUTPUT, `relevant=${relevant}\n`);
+          NODE
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        if: steps.changes.outputs.relevant == 'true'
+        with:
+          python-version: '3.13.9'
+      - name: Install locked test tools without lifecycle scripts
+        if: steps.changes.outputs.relevant == 'true'
+        run: npm ci --ignore-scripts
+      - name: Regress preparation, trust, signing, assembly and cache gates
+        if: steps.changes.outputs.relevant == 'true'
+        run: node --test scripts/automatic-release.node-test.mjs scripts/release.node-test.mjs scripts/release-downloads.node-test.mjs scripts/release-build-cache.node-test.mjs scripts/sign-macos-release.node-test.mjs scripts/release-assembly.node-test.mjs scripts/build-cli.node-test.mjs scripts/rust-dependency-cache.node-test.mjs scripts/parallel-cli.node-test.mjs scripts/test-profile-ab.node-test.mjs scripts/release-test-plan.node-test.mjs

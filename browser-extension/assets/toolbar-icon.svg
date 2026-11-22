@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title description">
+  <title id="title">Super-SAG</title>
+  <desc id="description">两片交错的书页组成 S 形，首尾的节点象征知识连接。</desc>
+  <rect x="24" y="24" width="976" height="976" rx="224" fill="#182B5C"/>
+  <path d="M690 280H423c-100 0-172 60-172 143 0 75 51 115 137 139l161 44 79-65-208-57c-38-11-56-26-56-53 0-32 27-53 67-53h201z" fill="#F8FAFF"/>
+  <path d="M334 744h267c100 0 172-60 172-143 0-75-51-115-137-139l-161-44-79 65 208 57c38 11 56 26 56 53 0 32-27 53-67 53H392z" fill="#64DED1"/>
+  <circle cx="730" cy="280" r="30" fill="#64DED1"/>
+  <circle cx="294" cy="744" r="30" fill="#F8FAFF"/>
+</svg>
