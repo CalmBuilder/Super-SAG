@@ -71,9 +71,9 @@ A local preview is not a deployment. This repository does not prescribe a hostin
 
 ## Release downloads / 版本下载信息
 
-README 使用 GitHub 最新正式版入口。安装页的 `ReleaseDownloads` 组件在浏览器中读取公开的 GitHub Latest Release API，显示版本、macOS/Windows 安装包链接和实际大小（十进制 MB，一位小数）。版本及附件经过校验；超时、限流或附件不完整时显示提示，用户可通过页面上的最新正式版链接下载。发布新版本后，重新打开安装页即可获取新信息，无需修改配置或提交文档 PR。
+安装页面链接到 GitHub 已发布的安装包，并说明可用平台和签名状态；发布新版本或新增平台时应同步更新页面。
 
-README links to the latest stable GitHub Release. The installation page's `ReleaseDownloads` component reads the public Latest Release API in the browser and displays the version, macOS/Windows installers and actual sizes (decimal MB, one decimal place). It validates the release and assets. If requests time out, are rate-limited, or return incomplete assets, the page points readers to its latest-release link. Reopening the page after a release retrieves current downloads without a configuration update or documentation PR.
+The installation page links to published installers on GitHub and states platform availability and signing status. Update the page when a new version or platform is published.
 
 ## Changelog generation and deployment verification / 更新日志生成与部署验证
 

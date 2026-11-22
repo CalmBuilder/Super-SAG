@@ -2,8 +2,8 @@
 
 ## 0.1.0
 
-- **候选版本**：准备 Super-SAG 桌面、CLI 与网页服务的品牌和安装配置；具体验证结果以本项目验收记录为准。
+- **首次发布**：提供 Super-SAG 桌面、CLI 与网页访问，支持文档索引、搜索和模型问答。Windows x64 安装包未经代码签名；macOS 安装包、分享码和文档组件在线下载暂不可用。
 
 ### English
 
-- **Candidate**: Prepare Super-SAG branding and installation settings for the desktop app, CLI and web service. See the project acceptance records for verified results.
+- **Initial release**: Super-SAG provides desktop, CLI and browser access for document indexing, search and model-assisted answers. The Windows x64 installer is unsigned; the macOS installer, share codes and online document-component downloads are not currently available.

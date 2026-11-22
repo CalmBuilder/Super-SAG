@@ -6,7 +6,7 @@
 
 Super-SAG 提供桌面、CLI 和浏览器访问方式，共用本地知识库。可添加文件夹并索引、搜索文档，配置模型进行问答，并通过 CLI 或 API 接入 Agent。
 
-初始版本 `0.1.0` 目前是本地候选，尚未发布。
+从 [Super-SAG v0.1.0](https://github.com/CalmBuilder/Super-SAG/releases/tag/v0.1.0) 下载 Windows x64 安装包。该安装包未经代码签名，macOS 安装包尚未提供。
 
 ## 文档
 
