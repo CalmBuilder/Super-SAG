@@ -6,7 +6,7 @@ English · [简体中文](README-CN.md)
 
 Super-SAG provides desktop, CLI and browser access to a shared knowledge base. Add folders to index and search documents, configure models for questions, and use the CLI or API with agents.
 
-Download the Windows x64 installer from [Super-SAG v0.1.0](https://github.com/CalmBuilder/Super-SAG/releases/tag/v0.1.0). The installer is unsigned. A macOS installer is not yet available.
+Download the Windows x64 installer and macOS Apple Silicon / Intel test installers from [Super-SAG v0.1.0](https://github.com/CalmBuilder/Super-SAG/releases/tag/v0.1.0). Windows is unsigned; the macOS builds are ad-hoc signed and not notarized.
 
 ## Documentation
 
